@@ -47,9 +47,8 @@ sources:
       url: "http://localhost:8000/api/triage/inbox"
       timeout: 30000
     returns:
-      urgent: "array"
-      normal: "array"
-      low: "array"
+      _type: "flat_array"
+      item_fields: ["id", "thread_id", "subject", "sender", "snippet", "date", "importance", "reason", "suggested_action"]
     outputs_to: ["merge-data"]
 
   - id: "fetch-calendar"
@@ -59,7 +58,8 @@ sources:
       url: "http://localhost:8000/api/calendar/events"
       timeout: 30000
     returns:
-      events: "array"
+      _type: "flat_array"
+      item_fields: ["id", "summary", "start", "end", "location", "description", "all_day"]
     outputs_to: ["merge-data"]
 
   - id: "fetch-plan"
@@ -67,9 +67,17 @@ sources:
     config:
       method: "POST"
       url: "http://localhost:8000/api/planner/generate"
-      timeout: 30000
+      timeout: 60000
+      body:
+        date: "{{TODAY}}"
+        calendar_events: "{{fetch-calendar.output}}"
+        triaged_emails: "{{fetch-emails.output}}"
     returns:
-      tasks: "array"
+      date: "string"
+      blocks: "array"
+      top_priorities: "array"
+      email_actions: "array"
+      summary: "string"
     outputs_to: ["merge-data"]
 
 # ── PROCESSING ───────────────────────────────────────────────
@@ -118,7 +126,7 @@ backend:
       logic: |
         Fetch unread emails from Gmail API.
         Score by sender importance, keywords, recency.
-        Return { urgent: [], normal: [], low: [] }
+        Return flat array of TriagedEmail: {id, thread_id, subject, sender, snippet, date, importance, reason, suggested_action}
 
     - id: "calendar-events"
       path: "/api/calendar/events"
@@ -127,9 +135,8 @@ backend:
       integrations: ["google_calendar"]
       logic: |
         Fetch today's events from all calendars.
-        Tag each with source (ATU vs Personal).
         Sort by start time.
-        Return { events: [] }
+        Return flat array of CalendarEvent: {id, summary, start, end, location, description, all_day}
 
     - id: "planner-generate"
       path: "/api/planner/generate"
@@ -137,9 +144,9 @@ backend:
       description: "Generate AI daily plan from emails + calendar"
       integrations: ["anthropic"]
       logic: |
-        Take email triage + calendar as context.
+        Accept DayPlanRequest: {date, calendar_events[], triaged_emails[], preferences?}
         Use Claude to generate prioritized daily plan.
-        Return { tasks: [] } with tags: do_now, schedule, delegate
+        Return DayPlan: {date, blocks[], top_priorities[], email_actions[], summary}
 
     - id: "voice-speak"
       path: "/api/voice/speak"
