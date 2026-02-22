@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>COOP Morning Briefing</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #050510;
+    color: #c0dfe8;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 400;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  .container {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 20px;
+    position: relative;
+  }
+
+  /* Subtle grid background */
+  .container::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: 
+      linear-gradient(rgba(0, 166, 207, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 166, 207, 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Header */
+  .header {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: 30px 0 20px;
+    border-bottom: 1px solid rgba(0, 166, 207, 0.2);
+    margin-bottom: 30px;
+  }
+
+  .logo-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-bottom: 8px;
+  }
+
+  .logo-icon {
+    width: 42px;
+    height: 42px;
+    position: relative;
+  }
+
+  /* SVG Alpaca icon placeholder - blue with glasses */
+  .logo-icon svg {
+    width: 42px;
+    height: 42px;
+  }
+
+  .logo-text {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 28px;
+    font-weight: 900;
+    letter-spacing: 6px;
+    color: #00a6cf;
+    text-shadow: 0 0 20px rgba(0, 166, 207, 0.4), 0 0 40px rgba(0, 166, 207, 0.15);
+  }
+
+  .header-subtitle {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: rgba(0, 166, 207, 0.5);
+    margin-top: 4px;
+  }
+
+  .date-line {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: rgba(192, 223, 232, 0.4);
+    margin-top: 12px;
+  }
+
+  /* Section Styling */
+  .section {
+    position: relative;
+    z-index: 1;
+    margin-bottom: 28px;
+    background: linear-gradient(135deg, rgba(0, 166, 207, 0.04) 0%, rgba(5, 5, 16, 0.8) 100%);
+    border: 1px solid rgba(0, 166, 207, 0.12);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 20px;
+    background: rgba(0, 166, 207, 0.06);
+    border-bottom: 1px solid rgba(0, 166, 207, 0.1);
+  }
+
+  .section-icon {
+    font-size: 14px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(0, 166, 207, 0.3);
+    border-radius: 3px;
+    background: rgba(0, 166, 207, 0.08);
+    color: #00a6cf;
+  }
+
+  .section-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #00a6cf;
+  }
+
+  .section-count {
+    margin-left: auto;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: rgba(0, 166, 207, 0.5);
+    background: rgba(0, 166, 207, 0.08);
+    padding: 2px 8px;
+    border-radius: 2px;
+    border: 1px solid rgba(0, 166, 207, 0.15);
+  }
+
+  .section-body {
+    padding: 16px 20px;
+  }
+
+  /* Email Items */
+  .email-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(0, 166, 207, 0.06);
+  }
+
+  .email-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .priority-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-top: 7px;
+    flex-shrink: 0;
+  }
+
+  .priority-urgent {
+    background: #ff3b5c;
+    box-shadow: 0 0 8px rgba(255, 59, 92, 0.5);
+  }
+
+  .priority-normal {
+    background: #f0a030;
+    box-shadow: 0 0 8px rgba(240, 160, 48, 0.3);
+  }
+
+  .priority-low {
+    background: rgba(0, 166, 207, 0.3);
+  }
+
+  .email-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .email-from {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: #e0f0f5;
+    margin-bottom: 2px;
+  }
+
+  .email-subject {
+    font-size: 13px;
+    color: rgba(192, 223, 232, 0.6);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .email-time {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: rgba(0, 166, 207, 0.4);
+    flex-shrink: 0;
+    margin-top: 4px;
+  }
+
+  .email-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .email-action {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border: 1px solid rgba(0, 166, 207, 0.2);
+    border-radius: 2px;
+    color: rgba(0, 166, 207, 0.6);
+    background: rgba(0, 166, 207, 0.04);
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+  }
+
+  .email-action:hover {
+    background: rgba(0, 166, 207, 0.12);
+    color: #00a6cf;
+    border-color: rgba(0, 166, 207, 0.4);
+  }
+
+  /* Calendar Timeline */
+  .cal-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(0, 166, 207, 0.06);
+  }
+
+  .cal-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .cal-time {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: #00a6cf;
+    width: 72px;
+    flex-shrink: 0;
+    text-align: right;
+    padding-top: 2px;
+  }
+
+  .cal-line {
+    width: 2px;
+    min-height: 40px;
+    background: linear-gradient(180deg, rgba(0, 166, 207, 0.4), rgba(0, 166, 207, 0.1));
+    flex-shrink: 0;
+    position: relative;
+  }
+
+  .cal-line::before {
+    content: '';
+    position: absolute;
+    top: 4px;
+    left: -3px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #050510;
+    border: 2px solid #00a6cf;
+    box-shadow: 0 0 6px rgba(0, 166, 207, 0.4);
+  }
+
+  .cal-details {
+    flex: 1;
+    padding-top: 1px;
+  }
+
+  .cal-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: #e0f0f5;
+  }
+
+  .cal-source {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 2px;
+    display: inline-block;
+    margin-top: 3px;
+  }
+
+  .cal-personal {
+    color: #00a6cf;
+    background: rgba(0, 166, 207, 0.1);
+    border: 1px solid rgba(0, 166, 207, 0.2);
+  }
+
+  .cal-work {
+    color: #f0a030;
+    background: rgba(240, 160, 48, 0.1);
+    border: 1px solid rgba(240, 160, 48, 0.2);
+  }
+
+  /* Daily Plan */
+  .plan-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 0;
+  }
+
+  .plan-number {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    color: #00a6cf;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(0, 166, 207, 0.3);
+    border-radius: 2px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .plan-text {
+    font-size: 14px;
+    color: rgba(192, 223, 232, 0.8);
+  }
+
+  .plan-tag {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 1px 5px;
+    border-radius: 2px;
+    margin-left: 6px;
+  }
+
+  .tag-do-now {
+    color: #ff3b5c;
+    background: rgba(255, 59, 92, 0.1);
+    border: 1px solid rgba(255, 59, 92, 0.2);
+  }
+
+  .tag-schedule {
+    color: #f0a030;
+    background: rgba(240, 160, 48, 0.1);
+    border: 1px solid rgba(240, 160, 48, 0.2);
+  }
+
+  .tag-delegate {
+    color: #00a6cf;
+    background: rgba(0, 166, 207, 0.1);
+    border: 1px solid rgba(0, 166, 207, 0.2);
+  }
+
+  /* Voice CTA */
+  .voice-cta {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: 20px;
+    margin-bottom: 28px;
+    background: linear-gradient(135deg, rgba(0, 166, 207, 0.06) 0%, rgba(5, 5, 16, 0.8) 100%);
+    border: 1px solid rgba(0, 166, 207, 0.15);
+    border-radius: 4px;
+  }
+
+  .voice-cta-text {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: rgba(0, 166, 207, 0.5);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .voice-cta-hint {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    color: rgba(192, 223, 232, 0.4);
+  }
+
+  .voice-cta-hint em {
+    color: #00a6cf;
+    font-style: italic;
+  }
+
+  /* Footer */
+  .footer {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: 24px 0;
+    border-top: 1px solid rgba(0, 166, 207, 0.1);
+  }
+
+  .footer-logo {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    color: rgba(0, 166, 207, 0.25);
+    text-transform: uppercase;
+  }
+
+  .footer-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: rgba(192, 223, 232, 0.15);
+    margin-top: 4px;
+    letter-spacing: 1px;
+  }
+
+  /* Scan line animation */
+  @keyframes scanline {
+    0% { top: -4px; }
+    100% { top: 100%; }
+  }
+
+  .section::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(0, 166, 207, 0.08), transparent);
+    animation: scanline 8s linear infinite;
+    pointer-events: none;
+  }
+
+  /* Responsive */
+  @media (max-width: 480px) {
+    .container { padding: 12px; }
+    .logo-text { font-size: 22px; letter-spacing: 4px; }
+    .section-body { padding: 12px 14px; }
+    .cal-time { width: 60px; font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <!-- HEADER -->
+    <div class="header">
+      <div class="logo-row">
+        <div class="logo-icon">
+          <svg viewBox="0 0 42 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Alpaca silhouette - blue -->
+            <circle cx="21" cy="18" r="10" fill="rgba(0,166,207,0.15)" stroke="#00a6cf" stroke-width="1.5"/>
+            <ellipse cx="21" cy="28" rx="12" ry="8" fill="rgba(0,166,207,0.1)" stroke="#00a6cf" stroke-width="1"/>
+            <!-- Glasses -->
+            <circle cx="17" cy="16" r="3.5" fill="none" stroke="#00a6cf" stroke-width="1.5"/>
+            <circle cx="25" cy="16" r="3.5" fill="none" stroke="#00a6cf" stroke-width="1.5"/>
+            <line x1="20.5" y1="16" x2="21.5" y2="16" stroke="#00a6cf" stroke-width="1.5"/>
+            <!-- Ears -->
+            <path d="M14 10 L12 5 L16 9" fill="#00a6cf" opacity="0.3"/>
+            <path d="M28 10 L30 5 L26 9" fill="#00a6cf" opacity="0.3"/>
+          </svg>
+        </div>
+        <span class="logo-text">COOP</span>
+      </div>
+      <div class="header-subtitle">Morning Briefing</div>
+      <div class="date-line">{{DATE}} · {{DAY_OF_WEEK}}</div>
+    </div>
+
+    <!-- PRIORITY EMAILS -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon">✉</div>
+        <div class="section-title">Inbox</div>
+        <div class="section-count">{{EMAIL_TOTAL}} messages</div>
+      </div>
+      <div class="section-body">
+        <!-- URGENT -->
+        <div class="email-item">
+          <div class="priority-dot priority-urgent"></div>
+          <div class="email-content">
+            <div class="email-from">{{URGENT_FROM_1}}</div>
+            <div class="email-subject">{{URGENT_SUBJECT_1}}</div>
+            <div class="email-actions">
+              <a href="{{REPLY_LINK_1}}" class="email-action">Reply</a>
+              <a href="{{ARCHIVE_LINK_1}}" class="email-action">Archive</a>
+              <a href="{{STAR_LINK_1}}" class="email-action">Star</a>
+            </div>
+          </div>
+          <div class="email-time">{{URGENT_TIME_1}}</div>
+        </div>
+
+        <div class="email-item">
+          <div class="priority-dot priority-urgent"></div>
+          <div class="email-content">
+            <div class="email-from">{{URGENT_FROM_2}}</div>
+            <div class="email-subject">{{URGENT_SUBJECT_2}}</div>
+            <div class="email-actions">
+              <a href="{{REPLY_LINK_2}}" class="email-action">Reply</a>
+              <a href="{{ARCHIVE_LINK_2}}" class="email-action">Archive</a>
+            </div>
+          </div>
+          <div class="email-time">{{URGENT_TIME_2}}</div>
+        </div>
+
+        <!-- NORMAL -->
+        <div class="email-item">
+          <div class="priority-dot priority-normal"></div>
+          <div class="email-content">
+            <div class="email-from">{{NORMAL_FROM_1}}</div>
+            <div class="email-subject">{{NORMAL_SUBJECT_1}}</div>
+          </div>
+          <div class="email-time">{{NORMAL_TIME_1}}</div>
+        </div>
+
+        <!-- LOW -->
+        <div class="email-item">
+          <div class="priority-dot priority-low"></div>
+          <div class="email-content">
+            <div class="email-from">{{LOW_FROM_1}} <span style="color:rgba(0,166,207,0.3)">+ {{LOW_COUNT}} more</span></div>
+            <div class="email-subject">Newsletters & promotions</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CALENDAR -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon">◈</div>
+        <div class="section-title">Schedule</div>
+        <div class="section-count">{{CAL_TOTAL}} events</div>
+      </div>
+      <div class="section-body">
+        <div class="cal-item">
+          <div class="cal-time">9:00 AM</div>
+          <div class="cal-line"></div>
+          <div class="cal-details">
+            <div class="cal-title">{{CAL_TITLE_1}}</div>
+            <span class="cal-source cal-personal">Personal</span>
+          </div>
+        </div>
+
+        <div class="cal-item">
+          <div class="cal-time">11:30 AM</div>
+          <div class="cal-line"></div>
+          <div class="cal-details">
+            <div class="cal-title">{{CAL_TITLE_2}}</div>
+            <span class="cal-source cal-work">ATU</span>
+          </div>
+        </div>
+
+        <div class="cal-item">
+          <div class="cal-time">2:00 PM</div>
+          <div class="cal-line"></div>
+          <div class="cal-details">
+            <div class="cal-title">{{CAL_TITLE_3}}</div>
+            <span class="cal-source cal-work">ATU</span>
+          </div>
+        </div>
+
+        <div class="cal-item">
+          <div class="cal-time">5:30 PM</div>
+          <div class="cal-line"></div>
+          <div class="cal-details">
+            <div class="cal-title">{{CAL_TITLE_4}}</div>
+            <span class="cal-source cal-personal">Personal</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DAILY PLAN -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon">⬡</div>
+        <div class="section-title">Daily Plan</div>
+      </div>
+      <div class="section-body">
+        <div class="plan-item">
+          <div class="plan-number">1</div>
+          <div class="plan-text">{{PLAN_1}} <span class="plan-tag tag-do-now">Do Now</span></div>
+        </div>
+        <div class="plan-item">
+          <div class="plan-number">2</div>
+          <div class="plan-text">{{PLAN_2}} <span class="plan-tag tag-do-now">Do Now</span></div>
+        </div>
+        <div class="plan-item">
+          <div class="plan-number">3</div>
+          <div class="plan-text">{{PLAN_3}} <span class="plan-tag tag-schedule">Schedule</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VOICE ON DEMAND -->
+    <div class="voice-cta">
+      <div class="voice-cta-text">Voice Available</div>
+      <div class="voice-cta-hint">Say <em>"COOP, brief me"</em> for the audio version</div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+      <div class="footer-logo">Brave Alpaca</div>
+      <div class="footer-sub">COOP · Life Cockpit · {{DATE}}</div>
+    </div>
+  </div>
+</body>
+</html>

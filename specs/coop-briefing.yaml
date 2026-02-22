@@ -1,0 +1,172 @@
+# ============================================================
+# FORGE App Spec — COOP Morning Briefing
+# ============================================================
+# This is the input FORGE reads. One file = one complete app.
+# FORGE generates all layers from this spec.
+# ============================================================
+
+app:
+  name: "COOP Morning Briefing"
+  id: "coop-briefing"
+  version: "1.0.0"
+  description: "Daily morning briefing with email triage, calendar, and daily plan — delivered as styled email + voice"
+  brand:
+    primary_color: "#00a6cf"
+    accent_color: "#ff3b5c"
+    warn_color: "#f0a030"
+    bg_color: "#050510"
+    text_color: "#c0dfe8"
+    font_display: "Orbitron"
+    font_body: "Rajdhani"
+    font_mono: "Share Tech Mono"
+    logo: "brave-alpaca"
+    theme: "tron"
+
+# ── TRIGGERS ─────────────────────────────────────────────────
+triggers:
+  - id: "scheduled-8am"
+    type: "schedule"
+    config:
+      cron: "0 8 * * *"
+      timezone: "America/Chicago"
+    outputs_to: ["fetch-emails", "fetch-calendar", "fetch-plan"]
+
+  - id: "voice-on-demand"
+    type: "webhook"
+    config:
+      method: "POST"
+      path: "/coop-brief-me"
+    outputs_to: ["fetch-emails", "fetch-calendar", "fetch-plan"]
+
+# ── DATA SOURCES ─────────────────────────────────────────────
+sources:
+  - id: "fetch-emails"
+    type: "api_call"
+    config:
+      method: "GET"
+      url: "http://localhost:8000/api/triage/inbox"
+      timeout: 30000
+    returns:
+      urgent: "array"
+      normal: "array"
+      low: "array"
+    outputs_to: ["merge-data"]
+
+  - id: "fetch-calendar"
+    type: "api_call"
+    config:
+      method: "GET"
+      url: "http://localhost:8000/api/calendar/events"
+      timeout: 30000
+    returns:
+      events: "array"
+    outputs_to: ["merge-data"]
+
+  - id: "fetch-plan"
+    type: "api_call"
+    config:
+      method: "POST"
+      url: "http://localhost:8000/api/planner/generate"
+      timeout: 30000
+    returns:
+      tasks: "array"
+    outputs_to: ["merge-data"]
+
+# ── PROCESSING ───────────────────────────────────────────────
+processors:
+  - id: "merge-data"
+    type: "merge"
+    inputs: ["fetch-emails", "fetch-calendar", "fetch-plan"]
+    mode: "wait_all"
+    outputs_to: ["build-briefing"]
+
+  - id: "build-briefing"
+    type: "transform"
+    template: "briefing-email"
+    voice_script: true
+    outputs_to: ["deliver"]
+
+# ── DELIVERY ─────────────────────────────────────────────────
+delivery:
+  - id: "send-email"
+    type: "email"
+    config:
+      to: "lundymatthew@gmail.com"
+      subject: "COOP · Morning Briefing · {{DATE}}"
+      body_from: "build-briefing.html"
+    trigger_filter: ["scheduled-8am", "voice-on-demand"]
+
+  - id: "speak-voice"
+    type: "voice"
+    config:
+      engine: "elevenlabs"
+      text_from: "build-briefing.voice"
+      timeout: 60000
+    trigger_filter: ["voice-on-demand"]
+
+# ── BACKEND SERVICES ─────────────────────────────────────────
+# FORGE generates these FastAPI routes
+backend:
+  framework: "fastapi"
+  port: 8000
+  services:
+    - id: "triage-inbox"
+      path: "/api/triage/inbox"
+      method: "GET"
+      description: "Fetch and prioritize Gmail inbox"
+      integrations: ["gmail"]
+      logic: |
+        Fetch unread emails from Gmail API.
+        Score by sender importance, keywords, recency.
+        Return { urgent: [], normal: [], low: [] }
+
+    - id: "calendar-events"
+      path: "/api/calendar/events"
+      method: "GET"
+      description: "Fetch today's calendar events"
+      integrations: ["google_calendar"]
+      logic: |
+        Fetch today's events from all calendars.
+        Tag each with source (ATU vs Personal).
+        Sort by start time.
+        Return { events: [] }
+
+    - id: "planner-generate"
+      path: "/api/planner/generate"
+      method: "POST"
+      description: "Generate AI daily plan from emails + calendar"
+      integrations: ["anthropic"]
+      logic: |
+        Take email triage + calendar as context.
+        Use Claude to generate prioritized daily plan.
+        Return { tasks: [] } with tags: do_now, schedule, delegate
+
+    - id: "voice-speak"
+      path: "/api/voice/speak"
+      method: "POST"
+      description: "Text-to-speech via ElevenLabs"
+      integrations: ["elevenlabs"]
+      logic: |
+        Accept { text: string }.
+        Send to ElevenLabs API.
+        Stream audio response.
+
+# ── INTEGRATIONS ─────────────────────────────────────────────
+integrations:
+  gmail:
+    type: "oauth2"
+    scopes: ["gmail.readonly"]
+    env_var: "GOOGLE_CREDENTIALS_JSON"
+
+  google_calendar:
+    type: "oauth2"
+    scopes: ["calendar.readonly"]
+    env_var: "GOOGLE_CREDENTIALS_JSON"
+
+  anthropic:
+    type: "api_key"
+    env_var: "ANTHROPIC_API_KEY"
+
+  elevenlabs:
+    type: "api_key"
+    env_var: "ELEVENLABS_API_KEY"
