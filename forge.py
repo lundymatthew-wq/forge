@@ -319,25 +319,32 @@ class OrchestrationGenerator:
             nodes.append(node)
 
         # ── SOURCES (Column 1) ──
+        # Only create HTTP nodes for GET sources. POST sources with a body
+        # (like the planner) are called inside the Code node after merge.
         sources = self.spec.get("sources", [])
-        for i, source in enumerate(sources):
+        fetch_sources = [s for s in sources if s.get("config", {}).get("method", "GET") == "GET"]
+        for i, source in enumerate(fetch_sources):
             node = self._build_source_node(source, i)
             nodes.append(node)
 
         # ── MERGE (Column 2) — Wait for all sources ──
-        if len(sources) > 1:
+        # Only merge sources that are direct fetches (GET). POST sources
+        # with a body (like the planner) are called inside the Code node
+        # after merge, so they get access to the other sources' data.
+        fetch_sources = [s for s in sources if s.get("config", {}).get("method", "GET") == "GET"]
+        post_sources = [s for s in sources if s.get("config", {}).get("method", "GET") != "GET"]
+
+        if len(fetch_sources) > 1:
             merge_node = {
                 "parameters": {
-                    "mode": "combine",
-                    "combinationMode": "mergeByPosition",
-                    "numberInputs": len(sources),
+                    "mode": "append",
                     "options": {},
                 },
                 "id": "merge-all",
                 "name": "Merge All Data",
                 "type": "n8n-nodes-base.merge",
                 "typeVersion": 3,
-                "position": self._next_pos(2, len(sources) // 2),
+                "position": self._next_pos(2, len(fetch_sources) // 2),
             }
             nodes.append(merge_node)
 
@@ -402,7 +409,7 @@ class OrchestrationGenerator:
                 "parameters": {
                     "httpMethod": cfg.get("method", "POST"),
                     "path": cfg.get("path", f"/webhook-{idx}").lstrip("/"),
-                    "responseMode": "responseNode",
+                    "responseMode": "lastNode",
                     "options": {},
                 },
                 "id": trigger["id"],
@@ -449,10 +456,10 @@ class OrchestrationGenerator:
             return {
                 "parameters": {
                     "method": "POST",
-                    "url": f"http://localhost:{self.spec.get('backend', {}).get('port', 8000)}/api/email/send",
+                    "url": f"http://localhost:{self.spec.get('backend', {}).get('port', 8000)}/api/gmail/send",
                     "sendBody": True,
                     "specifyBody": "json",
-                    "jsonBody": '={{ JSON.stringify({ to: "' + cfg.get("to", "") + '", subject: $json.subject, html: $json.html }) }}',
+                    "jsonBody": '={{ JSON.stringify({ to: "' + cfg.get("to", "") + '", subject: $json.subject, body: $json.html }) }}',
                     "options": {"timeout": 30000},
                 },
                 "id": delivery["id"],
@@ -487,10 +494,15 @@ class OrchestrationGenerator:
         processors = self.spec.get("processors", [])
         deliveries = self.spec.get("delivery", [])
 
-        # Triggers → Sources (fan out)
+        # Split sources: GET sources get fetched as nodes, POST sources
+        # are called inside the Code node (they need upstream data).
+        fetch_sources = [s for s in sources if s.get("config", {}).get("method", "GET") == "GET"]
+
+        # Triggers → fetch sources only (fan out)
         for trigger in triggers:
             trigger_name = trigger.get("name", trigger["id"])
-            targets = trigger.get("outputs_to", [])
+            fetch_ids = [s["id"] for s in fetch_sources]
+            targets = [t for t in trigger.get("outputs_to", []) if t in fetch_ids]
             if targets:
                 connections[trigger_name] = {
                     "main": [
@@ -501,8 +513,8 @@ class OrchestrationGenerator:
                     ]
                 }
 
-        # Sources → Merge (each to its own input index)
-        for i, source in enumerate(sources):
+        # Fetch sources → Merge (each to its own input index)
+        for i, source in enumerate(fetch_sources):
             source_name = source.get("name", source["id"])
             connections[source_name] = {
                 "main": [
@@ -552,83 +564,92 @@ class OrchestrationGenerator:
         return node_id
 
     def _generate_transform_code(self, proc: dict) -> str:
-        """Generate the JS transform code for the code node."""
-        brand = self.spec["app"].get("brand", {})
-        app_name = self.spec["app"]["name"]
+        """Generate the JS transform code for the code node.
 
-        # This is the code template — FORGE generates this from the spec
-        return f'''// ═══ FORGE-GENERATED TRANSFORM ═══
+        Reads the spec to determine:
+        - Which sources return flat arrays (classified by field sniffing)
+        - Which POST sources need to be called inline after merge
+        - How to build voice + HTML output
+        """
+        app_name = self.spec["app"]["name"]
+        sources = self.spec.get("sources", [])
+
+        # Find POST sources that need inline calls (they have a body config)
+        post_sources = [s for s in sources if s.get("config", {}).get("method", "GET") != "GET"]
+
+        # Build inline API call code for POST sources
+        inline_calls = ""
+        for ps in post_sources:
+            cfg = ps.get("config", {})
+            url = cfg.get("url", "")
+            timeout = cfg.get("timeout", 60000)
+            # Build the body from config, replacing template vars
+            body_cfg = cfg.get("body", {})
+            if body_cfg:
+                inline_calls += f"""
+const plan = await this.helpers.httpRequest({{
+  method: 'POST',
+  url: '{url}',
+  body: {{ date: today, calendar_events, triaged_emails }},
+  json: true,
+  timeout: {timeout},
+  headers: {{ 'Content-Type': 'application/json' }}
+}});
+"""
+            else:
+                inline_calls += f"""
+const plan = await this.helpers.httpRequest({{
+  method: 'POST',
+  url: '{url}',
+  body: {{ date: today }},
+  json: true,
+  timeout: {timeout},
+  headers: {{ 'Content-Type': 'application/json' }}
+}});
+"""
+
+        # Detect which sources are emails vs calendar from spec field hints
+        email_source = next((s for s in sources if "triage" in s["id"] or "email" in s["id"]), None)
+        cal_source = next((s for s in sources if "calendar" in s["id"] or "event" in s["id"]), None)
+
+        # Determine field-sniffing logic from spec returns
+        email_fields = ""
+        cal_fields = ""
+        if email_source:
+            returns = email_source.get("returns", {})
+            if returns.get("_type") == "flat_array":
+                # Flat array — sniff by importance + sender
+                email_fields = "j.importance && j.sender"
+            else:
+                email_fields = "j.importance && j.sender"
+        if cal_source:
+            returns = cal_source.get("returns", {})
+            if returns.get("_type") == "flat_array":
+                cal_fields = "j.summary && j.start && j.end"
+            else:
+                cal_fields = "j.summary && j.start && j.end"
+
+        return f"""// ═══ FORGE-GENERATED TRANSFORM ═══
 // App: {app_name}
 // Generated: {datetime.now().isoformat()}
-//
-// This node receives merged data from all sources
-// and builds both HTML email and voice script outputs.
+// Matched to Life Cockpit API response shapes
 
 const items = $input.all();
-const now = new Date();
-const dateStr = now.toLocaleDateString('en-US', {{ weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }});
-
-// ── Parse incoming merged data ──
-let emailData = {{}};
-let calendarData = {{}};
-let planData = {{}};
+const triaged_emails = [];
+const calendar_events = [];
 
 for (const item of items) {{
   const j = item.json;
-  if (j.urgent || j.normal || j.low) emailData = j;
-  else if (j.events) calendarData = j;
-  else if (j.tasks) planData = j;
+  if ({email_fields}) {{
+    triaged_emails.push(j);
+  }} else if ({cal_fields}) {{
+    calendar_events.push(j);
+  }}
 }}
 
-const urgent = Array.isArray(emailData.urgent) ? emailData.urgent : [];
-const normal = Array.isArray(emailData.normal) ? emailData.normal : [];
-const low = Array.isArray(emailData.low) ? emailData.low : [];
-const events = Array.isArray(calendarData.events) ? calendarData.events : [];
-const tasks = Array.isArray(planData.tasks) ? planData.tasks : [];
-const totalEmails = urgent.length + normal.length + low.length;
-
-// ── Build voice script (concise for ElevenLabs credits) ──
-let voice = 'Good morning, Sir. ';
-if (totalEmails > 0) {{
-  voice += totalEmails + ' emails. ';
-  if (urgent.length > 0) {{
-    voice += urgent.length + ' urgent. ';
-    for (const e of urgent.slice(0, 3)) {{
-      voice += (e.from || 'Unknown') + ': ' + (e.subject || 'no subject') + '. ';
-    }}
-  }}
-}} else {{
-  voice += 'Inbox clear. ';
-}}
-if (events.length > 0) {{
-  voice += events.length + ' events today. ';
-  for (const ev of events.slice(0, 3)) {{
-    voice += (ev.summary || ev.title || 'event') + '. ';
-  }}
-}} else {{
-  voice += 'Calendar clear. ';
-}}
-voice += 'Anything to dig into, Sir?';
-
-// ── Build HTML (uses FORGE template injection) ──
-// The HTML is generated from the template at build time.
-// See layer3-execution/frontend/briefing.html for the full template.
-// Here we return data for the backend to inject into the template.
-
-return [{{
-  json: {{
-    html_data: {{
-      date: dateStr,
-      day: now.toLocaleDateString('en-US', {{ weekday: 'long' }}).toUpperCase(),
-      emails: {{ urgent, normal, low, total: totalEmails }},
-      events,
-      tasks,
-    }},
-    voice,
-    subject: 'COOP · Morning Briefing · ' + now.toLocaleDateString('en-US', {{ month: '2-digit', day: '2-digit', year: 'numeric' }}),
-    timestamp: now.toISOString(),
-  }}
-}}];'''
+const today = new Date().toISOString().split('T')[0];
+{inline_calls}
+return [{{ json: {{ triaged_emails, calendar_events, plan }} }}];"""
 
     def _gen_routing_map(self):
         """Generate a visual routing map (Mermaid diagram)."""
@@ -790,37 +811,23 @@ if __name__ == "__main__":
         integrations = service.get("integrations", [])
         logic = service.get("logic", "# TODO: implement")
 
-        # Build imports based on integrations
-        imports = ["from fastapi import APIRouter, HTTPException"]
-        if "gmail" in integrations or "google_calendar" in integrations:
-            imports.append("from services.google_auth import get_google_service")
-        if "anthropic" in integrations:
-            imports.append("import anthropic")
-            imports.append("import os")
-        if "elevenlabs" in integrations:
-            imports.append("import httpx")
-            imports.append("import os")
-            imports.append("from fastapi.responses import StreamingResponse")
-
-        # Build route function
+        # Delegate to integration-specific full-file generators
         if "gmail" in integrations:
-            body = self._gen_gmail_route_body(service)
+            code = self._gen_gmail_route_file(service)
         elif "google_calendar" in integrations:
-            body = self._gen_calendar_route_body(service)
+            code = self._gen_calendar_route_file(service)
         elif "anthropic" in integrations:
-            body = self._gen_ai_route_body(service)
+            code = self._gen_ai_route_file(service)
         elif "elevenlabs" in integrations:
-            body = self._gen_voice_route_body(service)
+            code = self._gen_voice_route_file(service)
         else:
-            body = f'    # {logic}\n    return {{"status": "ok"}}'
-
-        code = f'''"""
+            code = f'''"""
 Route: {service["description"]}
 Path: {path}
 Generated by FORGE
 """
 
-{chr(10).join(imports)}
+from fastapi import APIRouter, HTTPException
 
 router = APIRouter()
 
@@ -829,171 +836,349 @@ router = APIRouter()
 async def {module_name}():
     """
     {service["description"]}
-    
-    Logic:
-{chr(10).join("    " + l for l in logic.strip().splitlines())}
     """
     try:
-{body}
+        # {logic}
+        return {{"status": "ok"}}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 '''
+
         route_path = routes_dir / f"{module_name}.py"
         route_path.write_text(code)
         print(f"    ✓ backend/routes/{module_name}.py")
 
-    def _gen_gmail_route_body(self, service: dict) -> str:
-        return '''        service = get_google_service("gmail", "v1")
+    def _gen_gmail_route_file(self, service: dict) -> str:
+        path = service.get("path", "/api/triage/inbox")
+        module_name = service["id"].replace("-", "_")
+        logic = service.get("logic", "")
+        return f'''"""
+Route: {service["description"]}
+Path: {path}
+Generated by FORGE — matched to Life Cockpit API
+"""
+
+from fastapi import APIRouter, HTTPException
+from services.google_auth import get_google_service
+
+router = APIRouter()
+
+IMPORTANCE_KEYWORDS = {{
+    "critical": ["declined", "locked", "security alert", "fraud"],
+    "high": ["urgent", "asap", "deadline", "action required", "verify", "@atu.edu"],
+    "low": ["newsletter", "noreply", "marketing", "promo", "unsubscribe"],
+}}
+
+
+def score_importance(sender: str, subject: str, snippet: str) -> tuple[str, str]:
+    text = f"{{sender}} {{subject}} {{snippet}}".lower()
+    for level in ("critical", "high", "low"):
+        for kw in IMPORTANCE_KEYWORDS[level]:
+            if kw in text:
+                return level, f"Matched keyword '{{kw}}' in {{level}} rules."
+    return "medium", "No priority keywords matched."
+
+
+def suggest_action(importance: str) -> str:
+    return {{"critical": "address immediately", "high": "read and address",
+            "low": "read when convenient"}}.get(importance, "read")
+
+
+@router.get("{path}")
+async def {module_name}():
+    """
+    {service["description"]}
+    Returns flat array of TriagedEmail objects.
+    """
+    try:
+        service = get_google_service("gmail", "v1")
         results = service.users().messages().list(
             userId="me", q="is:unread", maxResults=20
         ).execute()
-        
-        messages = results.get("messages", [])
-        urgent, normal, low = [], [], []
-        
-        for msg_meta in messages:
+
+        triaged = []
+        for msg_meta in results.get("messages", []):
             msg = service.users().messages().get(
                 userId="me", id=msg_meta["id"], format="metadata",
                 metadataHeaders=["From", "Subject", "Date"]
             ).execute()
-            
-            headers = {h["name"]: h["value"] for h in msg.get("payload", {}).get("headers", [])}
-            email = {
-                "id": msg["id"],
-                "from": headers.get("From", "Unknown"),
-                "subject": headers.get("Subject", "No subject"),
-                "time": headers.get("Date", ""),
-                "snippet": msg.get("snippet", ""),
-            }
-            
-            # Priority scoring — customize these rules
-            sender = email["from"].lower()
-            subject = email["subject"].lower()
-            
-            if any(kw in subject for kw in ["urgent", "asap", "deadline", "action required"]):
-                urgent.append(email)
-            elif any(kw in sender for kw in ["@atu.edu", "asbtdc", "client"]):
-                urgent.append(email)
-            elif any(kw in sender for kw in ["newsletter", "noreply", "marketing", "promo"]):
-                low.append(email)
-            else:
-                normal.append(email)
-        
-        return {"urgent": urgent, "normal": normal, "low": low}'''
 
-    def _gen_calendar_route_body(self, service: dict) -> str:
-        return '''        from datetime import datetime, timedelta
-        
+            headers = {{h["name"]: h["value"] for h in msg.get("payload", {{}}).get("headers", [])}}
+            sender = headers.get("From", "Unknown")
+            subject = headers.get("Subject", "No subject")
+            snippet = msg.get("snippet", "")
+            importance, reason = score_importance(sender, subject, snippet)
+
+            triaged.append({{
+                "id": msg["id"],
+                "thread_id": msg.get("threadId", msg["id"]),
+                "subject": subject,
+                "sender": sender,
+                "snippet": snippet,
+                "date": headers.get("Date", ""),
+                "importance": importance,
+                "reason": reason,
+                "suggested_action": suggest_action(importance),
+            }})
+
+        return triaged
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+'''
+
+    def _gen_calendar_route_file(self, service: dict) -> str:
+        path = service.get("path", "/api/calendar/events")
+        module_name = service["id"].replace("-", "_")
+        return f'''"""
+Route: {service["description"]}
+Path: {path}
+Generated by FORGE — matched to Life Cockpit API
+"""
+
+from fastapi import APIRouter, HTTPException
+from services.google_auth import get_google_service
+
+router = APIRouter()
+
+
+@router.get("{path}")
+async def {module_name}():
+    """
+    {service["description"]}
+    Returns flat array of CalendarEvent objects.
+    """
+    try:
+        from datetime import datetime
+
         service = get_google_service("calendar", "v3")
-        
+
         now = datetime.utcnow()
         start = now.replace(hour=0, minute=0, second=0).isoformat() + "Z"
         end = now.replace(hour=23, minute=59, second=59).isoformat() + "Z"
-        
-        # Fetch from all calendars
+
         cal_list = service.calendarList().list().execute()
         all_events = []
-        
+
         for cal in cal_list.get("items", []):
             cal_id = cal["id"]
-            cal_name = cal.get("summary", "Unknown")
-            
             events_result = service.events().list(
                 calendarId=cal_id,
-                timeMin=start,
-                timeMax=end,
-                singleEvents=True,
-                orderBy="startTime",
+                timeMin=start, timeMax=end,
+                singleEvents=True, orderBy="startTime",
             ).execute()
-            
-            for event in events_result.get("items", []):
-                all_events.append({
-                    "summary": event.get("summary", "Untitled"),
-                    "start": event.get("start", {}).get("dateTime", event.get("start", {}).get("date", "")),
-                    "end": event.get("end", {}).get("dateTime", ""),
-                    "calendar": cal_name,
-                    "location": event.get("location", ""),
-                })
-        
-        all_events.sort(key=lambda e: e.get("start", ""))
-        return {"events": all_events}'''
 
-    def _gen_ai_route_body(self, service: dict) -> str:
-        return '''        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        
-        # Load system prompt from directive layer
-        import json
-        prompts_path = os.path.join(os.path.dirname(__file__), "..", "..", "layer1-directive", "system-prompts.json")
-        system_prompt = "You are a daily planning assistant. Generate a prioritized task list."
-        
+            for event in events_result.get("items", []):
+                start_obj = event.get("start", {{}})
+                end_obj = event.get("end", {{}})
+                is_all_day = "date" in start_obj and "dateTime" not in start_obj
+
+                all_events.append({{
+                    "id": event.get("id", ""),
+                    "summary": event.get("summary", "Untitled"),
+                    "start": start_obj.get("dateTime", start_obj.get("date", "")),
+                    "end": end_obj.get("dateTime", end_obj.get("date", "")),
+                    "location": event.get("location", ""),
+                    "description": event.get("description", ""),
+                    "all_day": is_all_day,
+                }})
+
+        all_events.sort(key=lambda e: e.get("start", ""))
+        return all_events
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+'''
+
+    def _gen_ai_route_file(self, service: dict) -> str:
+        path = service.get("path", "/api/planner/generate")
+        module_name = service["id"].replace("-", "_")
+        return f'''"""
+Route: {service["description"]}
+Path: {path}
+Generated by FORGE — matched to Life Cockpit API
+"""
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+import anthropic
+import json
+import os
+import re
+
+router = APIRouter()
+
+
+class CalendarEvent(BaseModel):
+    id: str
+    summary: str
+    start: str
+    end: str
+    location: str = ""
+    description: str = ""
+    all_day: bool = False
+
+
+class TriagedEmail(BaseModel):
+    id: str
+    thread_id: str
+    subject: str
+    sender: str
+    snippet: str
+    date: str
+    importance: str
+    reason: str
+    suggested_action: str
+
+
+class DayPlanRequest(BaseModel):
+    date: str
+    calendar_events: list[CalendarEvent] = []
+    triaged_emails: list[TriagedEmail] = []
+    preferences: str = ""
+
+
+class TimeBlock(BaseModel):
+    start: str
+    end: str
+    title: str
+    category: str
+    notes: str = ""
+
+
+class DayPlan(BaseModel):
+    date: str
+    blocks: list[TimeBlock]
+    top_priorities: list[str]
+    email_actions: list[str]
+    summary: str
+
+
+@router.post("{path}", response_model=DayPlan)
+async def {module_name}(request: DayPlanRequest):
+    """
+    {service["description"]}
+    Accepts DayPlanRequest, returns DayPlan.
+    """
+    try:
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+        prompts_path = os.path.join(
+            os.path.dirname(__file__), "..", "..", "layer1-directive", "system-prompts.json"
+        )
+        system_prompt = "You are a daily planning assistant. Generate a structured day plan."
         try:
             with open(prompts_path) as f:
                 prompts = json.load(f)
-                if "planner-generate" in prompts:
-                    system_prompt = prompts["planner-generate"]["system"]
+                if "{service["id"]}" in prompts:
+                    system_prompt = prompts["{service["id"]}"]["system"]
         except FileNotFoundError:
             pass
-        
+
+        email_summary = "\\n".join(
+            f"- [{{e.importance.upper()}}] {{e.sender}}: {{e.subject}}"
+            for e in request.triaged_emails[:10]
+        ) or "No emails."
+
+        cal_summary = "\\n".join(
+            f"- {{e.start}} — {{e.summary}}"
+            for e in request.calendar_events[:10]
+        ) or "No events."
+
+        user_message = f"""Date: {{request.date}}
+
+Emails:
+{{email_summary}}
+
+Calendar:
+{{cal_summary}}
+
+{{f"Preferences: {{request.preferences}}" if request.preferences else ""}}
+
+Generate a structured daily plan as JSON with this exact schema:
+{{{{"date": "{{request.date}}", "blocks": [{{{{"start": "HH:MM", "end": "HH:MM", "title": "...", "category": "...", "notes": "..."}}}}], "top_priorities": ["..."], "email_actions": ["..."], "summary": "..."}}}}
+Categories: deep_work, email, admin, habit, break. Return ONLY valid JSON."""
+
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=1024,
+            max_tokens=2048,
             system=system_prompt,
-            messages=[{
-                "role": "user",
-                "content": "Generate my prioritized daily plan based on current context. Return as JSON array of {task, tag, priority} objects. Tags: do_now, schedule, delegate."
-            }],
+            messages=[{{"role": "user", "content": user_message}}],
         )
-        
-        # Parse response
-        text = response.content[0].text
-        try:
-            # Try to extract JSON from response
-            import re
-            json_match = re.search(r"\\[.*\\]", text, re.DOTALL)
-            if json_match:
-                tasks = json.loads(json_match.group())
-            else:
-                tasks = [{"task": text.strip(), "tag": "do_now", "priority": 1}]
-        except (json.JSONDecodeError, AttributeError):
-            tasks = [{"task": text.strip(), "tag": "do_now", "priority": 1}]
-        
-        return {"tasks": tasks}'''
 
-    def _gen_voice_route_body(self, service: dict) -> str:
-        return '''        from pydantic import BaseModel
-        
-        class VoiceRequest(BaseModel):
-            text: str
-        
-        # This route needs the request body — refactored for POST
-        # For now, return the endpoint info
-        api_key = os.getenv("ELEVENLABS_API_KEY")
-        if not api_key:
-            raise HTTPException(status_code=500, detail="ELEVENLABS_API_KEY not set")
-        
-        # Default voice — customize in .env
-        voice_id = os.getenv("ELEVENLABS_VOICE_ID", "pNInz6obpgDQGcFmaJgB")  # Adam
-        
+        text = response.content[0].text
+        json_match = re.search(r"\\{{.*\\}}", text, re.DOTALL)
+        if json_match:
+            plan_data = json.loads(json_match.group())
+        else:
+            plan_data = {{
+                "date": request.date, "blocks": [],
+                "top_priorities": [text.strip()[:200]],
+                "email_actions": [], "summary": "Could not parse structured plan.",
+            }}
+
+        plan_data["date"] = request.date
+        return DayPlan(**plan_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+'''
+
+    def _gen_voice_route_file(self, service: dict) -> str:
+        path = service.get("path", "/api/voice/speak")
+        module_name = service["id"].replace("-", "_")
+        return f'''"""
+Route: {service["description"]}
+Path: {path}
+Generated by FORGE — matched to Life Cockpit API
+"""
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from fastapi.responses import StreamingResponse
+import httpx
+import os
+
+router = APIRouter()
+
+
+class SpeakRequest(BaseModel):
+    text: str
+
+
+@router.post("{path}")
+async def {module_name}(request: SpeakRequest):
+    """
+    {service["description"]}
+    Accepts {{ text: string }}, returns mp3 audio stream.
+    """
+    api_key = os.getenv("ELEVENLABS_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="ELEVENLABS_API_KEY not set")
+
+    voice_id = os.getenv("ELEVENLABS_VOICE_ID", "pNInz6obpgDQGcFmaJgB")
+
+    try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream",
-                headers={"xi-api-key": api_key},
-                json={
-                    "text": "Briefing ready.",  # Will be replaced with actual text
+                f"https://api.elevenlabs.io/v1/text-to-speech/{{voice_id}}/stream",
+                headers={{"xi-api-key": api_key}},
+                json={{
+                    "text": request.text,
                     "model_id": "eleven_turbo_v2",
-                    "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
-                },
+                    "voice_settings": {{"stability": 0.5, "similarity_boost": 0.75}},
+                }},
                 timeout=60.0,
             )
-            
+
             if response.status_code != 200:
                 raise HTTPException(status_code=502, detail="ElevenLabs API error")
-            
+
             return StreamingResponse(
                 iter([response.content]),
                 media_type="audio/mpeg",
-                headers={"Content-Disposition": "inline; filename=briefing.mp3"},
-            )'''
+                headers={{"Content-Disposition": "inline; filename=briefing.mp3"}},
+            )
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+'''
 
     def _gen_backend_services(self):
         """Generate shared service modules (Google auth, etc.)."""
