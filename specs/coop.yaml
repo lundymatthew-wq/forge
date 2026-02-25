@@ -1,0 +1,474 @@
+# ============================================================
+# FORGE App Spec — COOP (Full Platform)
+# ============================================================
+# Comprehensive spec covering all 8 Coop modules, 27+ routes.
+# Generates all 5 layers: Directive, Orchestration, Execution,
+# Scaffold (Layer 4), and RALPH (Layer 5).
+# ============================================================
+
+app:
+  name: "COOP"
+  id: "coop"
+  version: "2.0.0"
+  description: "Voice-enabled personal assistant and daily coach — email triage, calendar, planner, project management, life cockpit, and voice chat"
+  brand:
+    primary_color: "#00a6cf"
+    accent_color: "#ff3b5c"
+    warn_color: "#f0a030"
+    bg_color: "#050510"
+    text_color: "#c0dfe8"
+    font_display: "Orbitron"
+    font_body: "Rajdhani"
+    font_mono: "Share Tech Mono"
+    logo: "brave-alpaca"
+    theme: "tron"
+
+# ── TRIGGERS ─────────────────────────────────────────────────
+triggers:
+  - id: "scheduled-8am"
+    type: "schedule"
+    config:
+      cron: "0 8 * * *"
+      timezone: "America/Chicago"
+    outputs_to: ["fetch-emails", "fetch-calendar", "fetch-plan"]
+
+  - id: "voice-on-demand"
+    type: "webhook"
+    config:
+      method: "POST"
+      path: "/coop-brief-me"
+    outputs_to: ["fetch-emails", "fetch-calendar", "fetch-plan"]
+
+# ── DATA SOURCES ─────────────────────────────────────────────
+sources:
+  - id: "fetch-emails"
+    type: "api_call"
+    config:
+      method: "GET"
+      url: "http://localhost:8000/api/triage/inbox"
+      timeout: 30000
+    returns:
+      _type: "flat_array"
+      item_fields: ["id", "thread_id", "subject", "sender", "snippet", "date", "importance", "reason", "suggested_action"]
+    outputs_to: ["merge-data"]
+
+  - id: "fetch-calendar"
+    type: "api_call"
+    config:
+      method: "GET"
+      url: "http://localhost:8000/api/calendar/events"
+      timeout: 30000
+    returns:
+      _type: "flat_array"
+      item_fields: ["id", "summary", "start", "end", "location", "description", "all_day"]
+    outputs_to: ["merge-data"]
+
+  - id: "fetch-plan"
+    type: "api_call"
+    config:
+      method: "POST"
+      url: "http://localhost:8000/api/planner/generate"
+      timeout: 60000
+      body:
+        date: "{{TODAY}}"
+        calendar_events: "{{fetch-calendar.output}}"
+        triaged_emails: "{{fetch-emails.output}}"
+    returns:
+      date: "string"
+      blocks: "array"
+      top_priorities: "array"
+      email_actions: "array"
+      summary: "string"
+    outputs_to: ["merge-data"]
+
+# ── PROCESSING ───────────────────────────────────────────────
+processors:
+  - id: "merge-data"
+    type: "merge"
+    inputs: ["fetch-emails", "fetch-calendar", "fetch-plan"]
+    mode: "wait_all"
+    outputs_to: ["build-briefing"]
+
+  - id: "build-briefing"
+    type: "transform"
+    template: "briefing-email"
+    voice_script: true
+    outputs_to: ["deliver"]
+
+# ── DELIVERY ─────────────────────────────────────────────────
+delivery:
+  - id: "send-email"
+    type: "email"
+    config:
+      to: "lundymatthew@gmail.com"
+      subject: "COOP · Morning Briefing · {{DATE}}"
+      body_from: "build-briefing.html"
+    trigger_filter: ["scheduled-8am", "voice-on-demand"]
+
+  - id: "speak-voice"
+    type: "voice"
+    config:
+      engine: "elevenlabs"
+      text_from: "build-briefing.voice"
+      timeout: 60000
+    trigger_filter: ["voice-on-demand"]
+
+# ── BACKEND SERVICES ─────────────────────────────────────────
+# FORGE generates FastAPI routes for each service
+backend:
+  framework: "fastapi"
+  port: 8000
+  services:
+    - id: "triage-inbox"
+      path: "/api/triage/inbox"
+      method: "GET"
+      description: "Fetch and prioritize Gmail inbox using Claude scoring"
+      integrations: ["gmail", "anthropic"]
+      logic: |
+        Fetch unread emails from Gmail API.
+        Send to Claude for importance scoring by sender, keywords, urgency.
+        Return flat array of TriagedEmail: {id, thread_id, subject, sender, snippet, date, importance, reason, suggested_action}
+
+    - id: "calendar-events"
+      path: "/api/calendar/events"
+      method: "GET"
+      description: "Fetch today's calendar events from Google Calendar"
+      integrations: ["google_calendar"]
+      logic: |
+        Fetch today's events from all calendars.
+        Sort by start time.
+        Return flat array of CalendarEvent: {id, summary, start, end, location, description, all_day}
+
+    - id: "planner-generate"
+      path: "/api/planner/generate"
+      method: "POST"
+      description: "Generate AI daily plan from emails + calendar"
+      integrations: ["anthropic"]
+      logic: |
+        Accept DayPlanRequest: {date, calendar_events[], triaged_emails[], preferences?}
+        Use Claude to generate prioritized daily plan with time blocks.
+        Return DayPlan: {date, blocks[], top_priorities[], email_actions[], summary}
+
+    - id: "voice-speak"
+      path: "/api/voice/speak"
+      method: "POST"
+      description: "Text-to-speech via ElevenLabs"
+      integrations: ["elevenlabs"]
+      logic: |
+        Accept { text: string }.
+        Send to ElevenLabs API.
+        Stream mp3 audio response.
+
+    - id: "voice-chat"
+      path: "/api/voice/chat"
+      method: "POST"
+      description: "Voice conversation with Claude — accepts audio, returns audio"
+      integrations: ["anthropic", "elevenlabs"]
+      logic: |
+        Accept voice input (audio or text).
+        Send to Claude for conversational response.
+        Convert response to speech via ElevenLabs.
+        Return {text, audio_url} or stream mp3.
+
+    - id: "gmail-messages"
+      path: "/api/gmail/messages"
+      method: "GET"
+      description: "List Gmail messages (raw, no triage)"
+      integrations: ["gmail"]
+      logic: |
+        Fetch messages from Gmail API with optional query params.
+        Return flat array of GmailMessage: {id, thread_id, subject, sender, snippet, date}
+
+    - id: "gmail-send"
+      path: "/api/gmail/send"
+      method: "POST"
+      description: "Send an email via Gmail"
+      integrations: ["gmail"]
+      logic: |
+        Accept {to, subject, body}.
+        Send email via Gmail API.
+        Return {message_id, thread_id, status}.
+
+    - id: "bridge-data"
+      path: "/api/bridge/data"
+      method: "GET"
+      description: "Life Cockpit data CRUD — tasks, habits, goals, identities"
+      integrations: ["aiosqlite"]
+      logic: |
+        GET: Return full Life Cockpit state {tasks[], habits[], goals[], identities[]}.
+        PUT: Accept and persist updated Life Cockpit state.
+        Data stored in ~/.coop/coop.db via aiosqlite.
+
+    - id: "pm-projects"
+      path: "/api/pm/projects"
+      method: "POST"
+      description: "Project management CRUD — projects, milestones, steps"
+      integrations: ["anthropic", "aiosqlite"]
+      logic: |
+        POST /api/pm/projects: Create project {title, description, deadline?, auto_breakdown?}.
+          If auto_breakdown is true, Claude generates milestones and steps.
+        PATCH /api/pm/projects/{id}: Update project fields (title, status, blockers).
+        PATCH /api/pm/projects/{id}/steps/{step_id}: Update step status/notes/due_date.
+        GET /api/pm/data: Return raw PM data {projects[], checkins[]}.
+        PUT /api/pm/data: Persist updated PM data.
+
+    - id: "pm-chat"
+      path: "/api/pm/chat"
+      method: "POST"
+      description: "Claude-powered PM check-in chat"
+      integrations: ["anthropic"]
+      logic: |
+        Accept {message, history[], project_id?}.
+        Send to Claude with project context for coaching/check-in.
+        Return {text, usage}.
+
+    - id: "pm-dashboard"
+      path: "/api/pm/dashboard"
+      method: "GET"
+      description: "Project management dashboard metrics"
+      integrations: ["aiosqlite"]
+      logic: |
+        Compute dashboard from PM data:
+        Return {active_projects, total_steps, done_steps, overall_progress, overdue[], blockers[], blocked_steps[]}
+
+# ── INTEGRATIONS ─────────────────────────────────────────────
+integrations:
+  gmail:
+    type: "oauth2"
+    scopes: ["gmail.readonly", "gmail.send"]
+    env_var: "GOOGLE_CREDENTIALS_JSON"
+
+  google_calendar:
+    type: "oauth2"
+    scopes: ["calendar.readonly"]
+    env_var: "GOOGLE_CREDENTIALS_JSON"
+
+  anthropic:
+    type: "api_key"
+    env_var: "ANTHROPIC_API_KEY"
+
+  elevenlabs:
+    type: "api_key"
+    env_var: "ELEVENLABS_API_KEY"
+
+  aiosqlite:
+    type: "local"
+    env_var: "COOP_DB_PATH"
+    config:
+      default_path: "~/.coop/coop.db"
+
+# ── SCAFFOLD (Layer 4) ──────────────────────────────────────
+scaffold:
+  enabled: true
+
+# ── RALPH (Layer 5) ──────────────────────────────────────────
+ralph:
+  enabled: true
+  tech_stack:
+    - "Python 3.12+"
+    - "FastAPI"
+    - "Pydantic"
+    - "aiosqlite"
+    - "Anthropic SDK"
+    - "ElevenLabs"
+    - "Google OAuth2"
+    - "React 18 (CDN)"
+  ci_commands:
+    - "python -m pytest tests/ -v --tb=short"
+  commit_convention: "feat|fix|chore: description (S-XXX)"
+  forbidden_patterns:
+    - "console.log used for debugging"
+    - "TODO left in code"
+    - "skipped tests"
+    - "hardcoded credentials"
+    - "bare except clauses"
+
+  stories:
+    - id: "S-001"
+      priority: 1
+      title: "Project scaffold and config"
+      description: |
+        Initialize the Coop project structure: pyproject.toml with uv, config.py
+        (Pydantic settings from .env), main.py FastAPI entry point, and basic test setup.
+        Establish directory layout: coop/, coop/auth/, coop/gmail/, coop/calendar/,
+        coop/triage/, coop/planner/, coop/bridge/, coop/voice/, coop/pm/, frontend/, tests/.
+      acceptance_criteria:
+        - "pyproject.toml exists with all dependencies"
+        - "config.py loads settings from .env via Pydantic"
+        - "main.py starts FastAPI with /health endpoint"
+        - "python -m pytest tests/ -v passes"
+      test_command: "python -m pytest tests/ -v"
+      depends_on: []
+      passes: false
+
+    - id: "S-002"
+      priority: 2
+      title: "Google OAuth2 auth module"
+      description: |
+        Implement coop/auth/ module: client.py (OAuth2 flow, token storage at
+        ~/.coop/token.json, auto-refresh), models.py (TokenInfo, UserInfo),
+        router.py (GET /api/auth/login, GET /api/auth/callback, GET /api/auth/status).
+      acceptance_criteria:
+        - "Auth router registered in main.py"
+        - "Token stored at ~/.coop/token.json"
+        - "Token auto-refresh on expiry"
+        - "python -m pytest tests/test_auth.py -v passes"
+      test_command: "python -m pytest tests/test_auth.py -v"
+      depends_on: ["S-001"]
+      passes: false
+
+    - id: "S-003"
+      priority: 3
+      title: "Gmail client and routes"
+      description: |
+        Implement coop/gmail/ module: client.py (Gmail API wrapper — list messages,
+        get message, send message), models.py (GmailMessage, SendRequest),
+        router.py (GET /api/gmail/messages, POST /api/gmail/send).
+      acceptance_criteria:
+        - "Gmail client fetches messages with mock credentials"
+        - "Send endpoint composes and sends via Gmail API"
+        - "python -m pytest tests/test_gmail.py -v passes"
+      test_command: "python -m pytest tests/test_gmail.py -v"
+      depends_on: ["S-002"]
+      passes: false
+
+    - id: "S-004"
+      priority: 4
+      title: "Calendar client and routes"
+      description: |
+        Implement coop/calendar/ module: client.py (Google Calendar API wrapper —
+        list events for date range), models.py (CalendarEvent),
+        router.py (GET /api/calendar/events).
+      acceptance_criteria:
+        - "Calendar client returns events sorted by start time"
+        - "all_day flag set correctly"
+        - "python -m pytest tests/test_calendar.py -v passes"
+      test_command: "python -m pytest tests/test_calendar.py -v"
+      depends_on: ["S-002"]
+      passes: false
+
+    - id: "S-005"
+      priority: 5
+      title: "Claude triage scorer"
+      description: |
+        Implement coop/triage/ module: client.py (Claude API call to score email
+        importance), models.py (TriagedEmail with importance/reason/suggested_action),
+        router.py (GET /api/triage/inbox). Uses gmail client to fetch, Claude to score.
+      acceptance_criteria:
+        - "Triage returns scored emails with importance 1-5"
+        - "Each email has reason and suggested_action"
+        - "python -m pytest tests/test_triage.py -v passes"
+      test_command: "python -m pytest tests/test_triage.py -v"
+      depends_on: ["S-003"]
+      passes: false
+
+    - id: "S-006"
+      priority: 6
+      title: "Claude day planner engine"
+      description: |
+        Implement coop/planner/ module: client.py (Claude generates daily plan from
+        calendar + triaged emails), models.py (DayPlanRequest, DayPlan, TimeBlock),
+        router.py (POST /api/planner/generate).
+      acceptance_criteria:
+        - "Planner accepts calendar events and triaged emails"
+        - "Returns time blocks, priorities, email actions, summary"
+        - "python -m pytest tests/test_planner.py -v passes"
+      test_command: "python -m pytest tests/test_planner.py -v"
+      depends_on: ["S-004", "S-005"]
+      passes: false
+
+    - id: "S-007"
+      priority: 7
+      title: "Bridge module (Life Cockpit CRUD)"
+      description: |
+        Implement coop/bridge/ module: store.py (aiosqlite CRUD for tasks, habits,
+        goals, identities), models.py (LifeCockpitData, Task, Habit, Goal, Identity),
+        router.py (GET/PUT /api/bridge/data).
+      acceptance_criteria:
+        - "GET returns full Life Cockpit state from SQLite"
+        - "PUT persists updated state"
+        - "python -m pytest tests/test_bridge.py -v passes"
+      test_command: "python -m pytest tests/test_bridge.py -v"
+      depends_on: ["S-001"]
+      passes: false
+
+    - id: "S-008"
+      priority: 8
+      title: "Voice module (TTS + chat)"
+      description: |
+        Implement coop/voice/ module: client.py (ElevenLabs TTS, Claude chat),
+        models.py (SpeakRequest, ChatRequest, ChatResponse),
+        router.py (POST /api/voice/speak, POST /api/voice/chat).
+      acceptance_criteria:
+        - "Speak endpoint streams mp3 audio"
+        - "Chat endpoint returns Claude response with usage stats"
+        - "python -m pytest tests/test_voice.py -v passes"
+      test_command: "python -m pytest tests/test_voice.py -v"
+      depends_on: ["S-002"]
+      passes: false
+
+    - id: "S-009"
+      priority: 9
+      title: "PM module (projects, milestones, steps)"
+      description: |
+        Implement coop/pm/ module: store.py (aiosqlite CRUD for projects, milestones,
+        steps, check-ins), models.py (Project, Milestone, Step, CheckIn),
+        router.py (POST /api/pm/projects, PATCH /api/pm/projects/{id},
+        PATCH /api/pm/projects/{id}/steps/{step_id}, GET/PUT /api/pm/data).
+      acceptance_criteria:
+        - "Create project with title and description"
+        - "Update project status and step completion"
+        - "GET/PUT data endpoints work for raw PM state"
+        - "python -m pytest tests/test_pm.py -v passes"
+      test_command: "python -m pytest tests/test_pm.py -v"
+      depends_on: ["S-007"]
+      passes: false
+
+    - id: "S-010"
+      priority: 10
+      title: "PM AI engine (chat + auto-breakdown)"
+      description: |
+        Implement coop/pm/engine.py: Claude-powered chat for PM check-ins and
+        auto-breakdown (generate milestones/steps from project description).
+        router.py additions: POST /api/pm/chat, GET /api/pm/dashboard.
+      acceptance_criteria:
+        - "PM chat returns Claude response with project context"
+        - "Auto-breakdown generates milestones and steps"
+        - "Dashboard returns progress metrics"
+        - "python -m pytest tests/test_pm_engine.py -v passes"
+      test_command: "python -m pytest tests/test_pm_engine.py -v"
+      depends_on: ["S-009"]
+      passes: false
+
+    - id: "S-011"
+      priority: 11
+      title: "Usage tracker and rate limiting"
+      description: |
+        Implement coop/usage.py: Claude API budget tracker with token + cost limits,
+        sliding-window rate limiting. Integrate with all Claude-calling modules
+        (triage, planner, voice, pm).
+      acceptance_criteria:
+        - "Token and cost counters increment on API calls"
+        - "Rate limiter blocks when window exceeded"
+        - "Budget alert at 80% threshold"
+        - "python -m pytest tests/test_usage.py -v passes"
+      test_command: "python -m pytest tests/test_usage.py -v"
+      depends_on: ["S-001"]
+      passes: false
+
+    - id: "S-012"
+      priority: 12
+      title: "Full integration test suite"
+      description: |
+        Write integration tests that exercise the full request lifecycle:
+        auth -> gmail -> triage -> planner, auth -> calendar, bridge CRUD,
+        pm CRUD -> pm chat, voice speak + chat. Use httpx AsyncClient with
+        mocked external APIs.
+      acceptance_criteria:
+        - "All module tests pass"
+        - "Integration tests cover cross-module flows"
+        - "No skipped tests"
+        - "python -m pytest tests/ -v passes with 0 failures"
+      test_command: "python -m pytest tests/ -v"
+      depends_on: ["S-001", "S-002", "S-003", "S-004", "S-005", "S-006", "S-007", "S-008", "S-009", "S-010", "S-011"]
+      passes: false
