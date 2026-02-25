@@ -1,0 +1,43 @@
+{
+  "meta": {
+    "project_name": "{{PROJECT_NAME}}",
+    "generated_by": "FORGE",
+    "generated_at": "{{ISO_TIMESTAMP}}",
+    "forge_version": "1.0",
+    "ralph_compatible": true,
+    "description": "{{ONE_LINE_DESCRIPTION}}",
+    "tech_stack": [],
+    "estimated_iterations": 0
+  },
+  "stories": [
+    {
+      "id": "S-001",
+      "priority": 1,
+      "title": "{{SHORT_TITLE}}",
+      "description": "{{WHAT_AND_WHY}}",
+      "acceptance_criteria": [
+        "{{CRITERION — must be machine-verifiable}}"
+      ],
+      "test_command": "{{COMMAND_THAT_RETURNS_EXIT_0_ON_PASS}}",
+      "depends_on": [],
+      "passes": false
+    }
+  ],
+  "guardrails": {
+    "max_iterations_per_story": 3,
+    "ci_commands": [],
+    "commit_convention": "feat|fix|chore: description (S-XXX)",
+    "forbidden_patterns": [
+      "console.log used for debugging",
+      "TODO left in code",
+      "skipped tests",
+      "hardcoded credentials"
+    ]
+  },
+  "_template_notes": {
+    "story_sizing": "Each story should be completable in ONE context window — roughly 200 lines of code changes max. If bigger, split it.",
+    "priority_order": "1 = highest. RALPH picks the lowest-numbered non-passing story. Dependencies must have lower priority numbers.",
+    "test_command": "Must return exit code 0 on pass, non-zero on fail. RALPH uses this to verify before committing.",
+    "acceptance_criteria": "Every criterion must be checkable by running a command, reading a file, or running a test. No subjective criteria."
+  }
+}

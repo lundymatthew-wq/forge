@@ -1,0 +1,17 @@
+# Core dependencies
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+pandas>=2.0.0
+numpy>=1.24.0
+chardet>=5.0.0
+
+# Visualization (optional, for future use)
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Data formats (optional)
+openpyxl>=3.1.0
+xlrd>=2.0.0
+
+# Environment variables
+python-dotenv>=1.0.0
