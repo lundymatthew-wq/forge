@@ -1,0 +1,675 @@
+# ============================================================
+# FORGE App Spec — HERD (Social Media Marketing Engine)
+# ============================================================
+# Full-stack content engine: client intake, strategic direction,
+# AI-powered content generation, QA, and delivery.
+# Knowledge base of 17 marketing frameworks, platform playbooks,
+# industry guides, and trend/seasonal pulse data.
+# Generates all 5 layers: Directive, Orchestration, Execution,
+# Scaffold (Layer 4), and RALPH (Layer 5).
+# ============================================================
+
+app:
+  name: "HERD"
+  id: "herd"
+  version: "1.0.0"
+  description: "Social media marketing engine — strategic content generation for small businesses using 17 marketing frameworks, platform playbooks, and AI-powered weekly content calendars"
+  brand:
+    primary_color: "#00a6cf"
+    accent_color: "#ff3b5c"
+    warn_color: "#f0a030"
+    bg_color: "#050510"
+    text_color: "#c0dfe8"
+    font_display: "Orbitron"
+    font_body: "Rajdhani"
+    font_mono: "Share Tech Mono"
+    logo: "brave-alpaca"
+    theme: "tron"
+
+# ── TRIGGERS ─────────────────────────────────────────────────
+triggers:
+  - id: "weekly-monday"
+    type: "schedule"
+    config:
+      cron: "0 6 * * 1"
+      timezone: "America/Chicago"
+    outputs_to: ["generate-all-clients"]
+
+  - id: "on-demand"
+    type: "webhook"
+    config:
+      method: "POST"
+      path: "/herd-generate"
+    outputs_to: ["generate-single-client"]
+
+# ── DATA SOURCES ─────────────────────────────────────────────
+sources:
+  - id: "load-client"
+    type: "api_call"
+    config:
+      method: "GET"
+      url: "http://localhost:8002/api/clients/{{CLIENT_SLUG}}"
+      timeout: 10000
+    returns:
+      _type: "object"
+      item_fields: ["slug", "business_name", "industry", "current_phase", "platforms", "active_frameworks", "tone", "content_ratio"]
+    outputs_to: ["assemble-context"]
+
+  - id: "load-knowledge"
+    type: "api_call"
+    config:
+      method: "GET"
+      url: "http://localhost:8002/api/director/{{CLIENT_SLUG}}/strategy"
+      timeout: 15000
+    returns:
+      _type: "object"
+      item_fields: ["phase_definition", "frameworks", "platform_playbooks", "industry_guide", "seasonal_calendar", "weekly_trends", "performance_data"]
+    outputs_to: ["assemble-context"]
+
+# ── PROCESSING ───────────────────────────────────────────────
+processors:
+  - id: "assemble-context"
+    type: "merge"
+    inputs: ["load-client", "load-knowledge"]
+    mode: "wait_all"
+    outputs_to: ["generate-content"]
+
+  - id: "generate-content"
+    type: "transform"
+    template: "content-calendar"
+    voice_script: false
+    outputs_to: ["deliver"]
+
+# ── DELIVERY ─────────────────────────────────────────────────
+delivery:
+  - id: "save-calendar"
+    type: "webhook"
+    config:
+      method: "POST"
+      url: "http://localhost:8002/api/content/calendar"
+      body_from: "generate-content.json"
+    trigger_filter: ["weekly-monday", "on-demand"]
+
+  - id: "send-email"
+    type: "email"
+    config:
+      to: "{{CLIENT_EMAIL}}"
+      subject: "HERD · Weekly Content Calendar · {{DATE}}"
+      body_from: "generate-content.html"
+    trigger_filter: ["weekly-monday"]
+
+# ── BACKEND SERVICES ─────────────────────────────────────────
+backend:
+  framework: "fastapi"
+  port: 8002
+  services:
+    - id: "client-list"
+      path: "/api/clients"
+      method: "GET"
+      description: "List all client profiles with summary info"
+      integrations: ["filesystem"]
+      logic: |
+        Read all client profile files from data/clients/.
+        Return array of ClientSummary: {slug, business_name, industry, tier, current_phase, platforms, posting_frequency}
+
+    - id: "client-create"
+      path: "/api/clients"
+      method: "POST"
+      description: "Create new client from intake questionnaire"
+      integrations: ["filesystem", "anthropic"]
+      logic: |
+        Accept ClientIntake: {business_name, owner_name, business_type, industry, description, location, audience, platforms, content_preferences, goals, tier}.
+        Strategic Director determines starting phase, selects initial frameworks via phase-definitions + client-segmentation rules.
+        Save client profile to data/clients/{slug}.yaml.
+        Return full ClientProfile with assigned phase and frameworks.
+
+    - id: "client-get"
+      path: "/api/clients/{slug}"
+      method: "GET"
+      description: "Get full client profile"
+      integrations: ["filesystem"]
+      logic: |
+        Read client profile from data/clients/{slug}.yaml.
+        Return full ClientProfile with all strategy, performance, and campaign data.
+
+    - id: "client-update"
+      path: "/api/clients/{slug}"
+      method: "PATCH"
+      description: "Update client profile fields, phase, or frameworks"
+      integrations: ["filesystem"]
+      logic: |
+        Accept partial ClientProfile update.
+        Merge with existing profile, validate phase transitions.
+        If phase changes, update active_frameworks per phase-definitions rules.
+        Save updated profile.
+
+    - id: "content-generate"
+      path: "/api/content/generate"
+      method: "POST"
+      description: "Generate weekly content calendar for a client"
+      integrations: ["anthropic", "filesystem"]
+      logic: |
+        Accept {slug, week_start?} — defaults to next Monday.
+        Director assembles full strategy context:
+          1. Load client profile (phase, frameworks, platforms, tone, pillars)
+          2. Load active framework definitions from knowledge/frameworks/
+          3. Load platform playbooks for client's platforms
+          4. Load industry guide for client's vertical
+          5. Check seasonal calendar and weekly trends from knowledge/pulse/
+          6. Load last week's performance data
+        Build system prompt from engine/system-prompt-template.md with assembled context.
+        Call Claude API (claude-sonnet-4-20250514, max_tokens 4096).
+        Parse response into structured ContentCalendar.
+        Run Output QA validation checks.
+        Save to data/calendars/{slug}/{week_start}.json.
+        Return ContentCalendar: {slug, week_start, posts[], warnings[], cost}
+
+    - id: "content-calendar-get"
+      path: "/api/content/{slug}/calendar"
+      method: "GET"
+      description: "Get current or historical content calendar"
+      integrations: ["filesystem"]
+      logic: |
+        Accept optional query params: week_start (default: current week).
+        Read from data/calendars/{slug}/{week_start}.json.
+        Return ContentCalendar with all posts and metadata.
+
+    - id: "content-post-edit"
+      path: "/api/content/{slug}/posts/{post_id}"
+      method: "PATCH"
+      description: "Edit or regenerate a specific post in a calendar"
+      integrations: ["anthropic", "filesystem"]
+      logic: |
+        Accept {caption?, hashtags?, platform?, feedback?}.
+        If feedback provided, regenerate post via Claude with original context + feedback.
+        Update post in calendar file.
+        Re-run QA on modified post.
+        Return updated ContentPost.
+
+    - id: "director-strategy"
+      path: "/api/director/{slug}/strategy"
+      method: "GET"
+      description: "Get assembled strategy context for a client"
+      integrations: ["filesystem"]
+      logic: |
+        Load client profile.
+        Assemble full strategy context from knowledge base:
+          - Phase definition from knowledge/director/phase-definitions.md
+          - Active framework docs from knowledge/frameworks/
+          - Platform playbooks from knowledge/platforms/
+          - Industry guide from knowledge/industries/
+          - Seasonal calendar from knowledge/pulse/
+          - Weekly trends from knowledge/pulse/
+        Return StrategyContext with all assembled knowledge.
+
+    - id: "director-evaluate"
+      path: "/api/director/{slug}/evaluate"
+      method: "POST"
+      description: "Evaluate whether client should advance to next phase"
+      integrations: ["anthropic", "filesystem"]
+      logic: |
+        Load client profile and performance data.
+        Check phase advancement triggers from phase-definitions.md.
+        Use Claude to assess readiness based on performance metrics.
+        Return PhaseEvaluation: {current_phase, recommended_phase, triggers_met[], triggers_unmet[], reasoning}
+
+    - id: "agents-run"
+      path: "/api/agents/{agent_name}/run"
+      method: "POST"
+      description: "Trigger a knowledge agent to update its data"
+      integrations: ["anthropic", "filesystem"]
+      logic: |
+        Accept {agent_name} from path — one of: platform-watchdog, trend-scout, seasonal-planner, industry-analyst.
+        Load agent instructions from knowledge/agents/{agent_name}.md.
+        Execute agent's process using Claude for research and analysis.
+        Update relevant knowledge base files.
+        Append to agent's run log.
+        Return AgentRunResult: {agent, started, completed, files_updated[], summary}
+
+    - id: "agents-status"
+      path: "/api/agents/status"
+      method: "GET"
+      description: "Get status and last run times for all knowledge agents"
+      integrations: ["filesystem"]
+      logic: |
+        Read run logs from all agent files in knowledge/agents/.
+        Return AgentStatusList: [{agent, last_run, next_scheduled, files_updated_count}]
+
+    - id: "knowledge-browse"
+      path: "/api/knowledge/{category}"
+      method: "GET"
+      description: "Browse knowledge base by category"
+      integrations: ["filesystem"]
+      logic: |
+        Accept category from path: frameworks, platforms, industries, pulse, director.
+        List and read files from knowledge/{category}/.
+        Return KnowledgeList: [{filename, title, last_updated, content_preview}]
+
+    - id: "campaign-create"
+      path: "/api/clients/{slug}/campaigns"
+      method: "POST"
+      description: "Create an On Ramp/EVENT/Off Ramp campaign"
+      integrations: ["anthropic", "filesystem"]
+      logic: |
+        Accept {event_name, event_date, event_type}.
+        Use Framework 01 rules to calculate On Ramp start (7-14 days before), Off Ramp end (1-7 days after).
+        Generate campaign skeleton with post suggestions for each phase.
+        Add campaign to client profile's campaigns.upcoming[].
+        Return Campaign: {name, on_ramp_start, event_date, off_ramp_end, posts_skeleton[]}
+
+    - id: "delivery-send"
+      path: "/api/delivery/{slug}/send"
+      method: "POST"
+      description: "Format and deliver content calendar to client"
+      integrations: ["filesystem"]
+      logic: |
+        Load current week's content calendar.
+        Format as delivery document (structured markdown).
+        Save to data/deliveries/{slug}/{date}.md.
+        Return DeliveryResult: {slug, format, delivered_at, post_count}
+
+    - id: "dashboard-overview"
+      path: "/api/dashboard"
+      method: "GET"
+      description: "Overview dashboard with all client stats"
+      integrations: ["filesystem"]
+      logic: |
+        Aggregate across all clients:
+        Return Dashboard: {total_clients, clients_by_phase, clients_by_tier, content_generated_this_week, total_posts_this_month, agent_statuses, cost_summary}
+
+# ── INTEGRATIONS ─────────────────────────────────────────────
+integrations:
+  anthropic:
+    type: "api_key"
+    env_var: "ANTHROPIC_API_KEY"
+
+  filesystem:
+    type: "local"
+    env_var: "HERD_DATA_DIR"
+    config:
+      default_path: "~/.herd"
+
+# ── SCAFFOLD (Layer 4) ──────────────────────────────────────
+scaffold:
+  enabled: true
+
+# ── RALPH (Layer 5) ──────────────────────────────────────────
+ralph:
+  enabled: true
+  tech_stack:
+    - "Python 3.12+"
+    - "FastAPI"
+    - "Pydantic"
+    - "Anthropic SDK"
+    - "PyYAML"
+    - "markdown"
+    - "Jinja2"
+  ci_commands:
+    - "python -m pytest tests/ -v --tb=short"
+  commit_convention: "feat|fix|chore: description (S-XXX)"
+  forbidden_patterns:
+    - "TODO left in code"
+    - "skipped tests"
+    - "hardcoded credentials"
+    - "bare except clauses"
+
+  stories:
+    - id: "S-001"
+      priority: 1
+      title: "Project scaffold, config, and knowledge loader"
+      description: |
+        Initialize HERD project: pyproject.toml with deps (fastapi, uvicorn, pydantic,
+        pydantic-settings, anthropic, pyyaml, jinja2, python-multipart, httpx, pytest,
+        pytest-asyncio). herd/config.py (Pydantic settings from .env: ANTHROPIC_API_KEY,
+        HERD_DATA_DIR default ~/.herd, HERD_KNOWLEDGE_DIR default ./knowledge,
+        model_default=claude-sonnet-4-20250514, max_tokens=4096).
+        herd/main.py (FastAPI with /health endpoint, CORS middleware).
+        herd/knowledge.py — KnowledgeBase class that reads markdown files from the
+        knowledge/ directory tree and provides methods: get_frameworks(), get_framework(num),
+        get_platforms(), get_platform(name), get_industries(), get_industry(name),
+        get_director_docs(), get_pulse(), get_agent_instructions(name).
+        Each method returns parsed markdown content as strings.
+        Copy the knowledge/ directory from the project scaffold into the working directory.
+        Directory layout: herd/, herd/clients/, herd/content/, herd/director/, herd/agents/,
+        herd/delivery/, tests/.
+      acceptance_criteria:
+        - "pyproject.toml exists with all dependencies"
+        - "config.py loads settings from .env via Pydantic"
+        - "main.py starts FastAPI with /health endpoint"
+        - "KnowledgeBase reads all 47 knowledge markdown files"
+        - "get_frameworks() returns all 17 frameworks"
+        - "get_platforms() returns 5 platform playbooks"
+        - "python -m pytest tests/ -v passes"
+      test_command: "python -m pytest tests/ -v"
+      depends_on: []
+      passes: false
+
+    - id: "S-002"
+      priority: 2
+      title: "Client profile CRUD"
+      description: |
+        Implement herd/clients/ module:
+        models.py — Pydantic models: ClientProfile (full schema from clients/_schema.md),
+        ClientIntake (intake form fields), ClientSummary (list view), ClientUpdate (partial).
+        store.py — File-based YAML storage at {HERD_DATA_DIR}/clients/{slug}.yaml.
+        Methods: list_clients(), get_client(slug), create_client(intake) -> generates slug
+        from business_name, save_client(profile), delete_client(slug).
+        router.py — GET /api/clients (list), POST /api/clients (create from intake),
+        GET /api/clients/{slug} (get full profile), PATCH /api/clients/{slug} (update),
+        DELETE /api/clients/{slug}.
+        On create: assign starting phase based on client-segmentation rules (business_stage
+        determines phase, market_type and business_model stored for framework selection).
+        Register router in main.py.
+      acceptance_criteria:
+        - "Client CRUD operations work (create, read, update, list, delete)"
+        - "Clients stored as YAML files in data dir"
+        - "Starting phase auto-assigned from business stage"
+        - "Slug generated from business name"
+        - "python -m pytest tests/test_clients.py -v passes"
+      test_command: "python -m pytest tests/test_clients.py -v"
+      depends_on: ["S-001"]
+      passes: false
+
+    - id: "S-003"
+      priority: 3
+      title: "Strategic Director engine"
+      description: |
+        Implement herd/director/ module:
+        engine.py — StrategicDirector class:
+        assemble_context(slug) — loads client profile, reads knowledge base to build
+        full strategy context: phase definition, active framework docs (only those
+        allowed by client's current phase per strategy-matrix.md rules),
+        platform playbooks for client's platforms, industry guide,
+        seasonal calendar from pulse/, weekly trends from pulse/.
+        evaluate_phase(slug) — checks advancement triggers from phase-definitions.md
+        against client performance data, returns recommendation.
+        select_frameworks(client) — applies framework-selection.md rules based on
+        phase, business type, and current goals.
+        models.py — StrategyContext, PhaseEvaluation, FrameworkSelection.
+        router.py — GET /api/director/{slug}/strategy,
+        POST /api/director/{slug}/evaluate.
+        Register router in main.py.
+      acceptance_criteria:
+        - "assemble_context returns full strategy with phase-gated frameworks"
+        - "Foundation clients do NOT get conversion frameworks"
+        - "evaluate_phase checks all triggers for current phase"
+        - "select_frameworks follows strategy-matrix rules"
+        - "python -m pytest tests/test_director.py -v passes"
+      test_command: "python -m pytest tests/test_director.py -v"
+      depends_on: ["S-001", "S-002"]
+      passes: false
+
+    - id: "S-004"
+      priority: 4
+      title: "Content generation engine"
+      description: |
+        Implement herd/content/ module:
+        engine.py — ContentEngine class:
+        generate_calendar(slug, week_start) — uses StrategicDirector.assemble_context()
+        to build full context, loads system-prompt-template.md from knowledge/engine/,
+        replaces all {{variables}} with assembled context, calls Claude API
+        (claude-sonnet-4-20250514, max_tokens 4096), parses structured response into
+        ContentCalendar model.
+        qa_validate(calendar) — checks: hook present on every post, CTA matches
+        temperature, no back-to-back same pillar, content ratio matches phase,
+        hashtag count appropriate for platform. Returns warnings list.
+        models.py — ContentCalendar, ContentPost (day, platform, pillar, temperature,
+        frameworks, strategic_intent, caption, hashtags, visual_suggestion, posting_time,
+        qa_status), GenerateRequest, QAResult.
+        store.py — save/load calendars as JSON at {HERD_DATA_DIR}/calendars/{slug}/{week}.json.
+        router.py — POST /api/content/generate, GET /api/content/{slug}/calendar,
+        PATCH /api/content/{slug}/posts/{post_id}.
+        Register router in main.py.
+      acceptance_criteria:
+        - "generate_calendar assembles prompt and calls Claude"
+        - "Response parsed into structured ContentCalendar"
+        - "QA validates pillar rotation, content ratio, hooks, CTAs"
+        - "Calendars stored as JSON files"
+        - "Edit/regenerate post works with feedback"
+        - "python -m pytest tests/test_content.py -v passes"
+      test_command: "python -m pytest tests/test_content.py -v"
+      depends_on: ["S-003"]
+      passes: false
+
+    - id: "S-005"
+      priority: 5
+      title: "Campaign manager"
+      description: |
+        Implement herd/content/campaigns.py:
+        CampaignManager class:
+        create_campaign(slug, event_name, event_date, event_type) — applies
+        Framework 01 (On Ramp/EVENT/Off Ramp) rules: calculates on_ramp_start
+        (7-14 days before), off_ramp_end (1-7 days after), generates campaign
+        skeleton with post suggestions for each phase.
+        get_active_campaigns(slug) — returns campaigns where today falls within
+        on_ramp_start to off_ramp_end.
+        inject_campaign_posts(calendar, campaigns) — injects campaign posts into
+        weekly content calendar at appropriate positions.
+        models.py additions — Campaign, CampaignPost, CampaignPhase.
+        router.py additions — POST /api/clients/{slug}/campaigns,
+        GET /api/clients/{slug}/campaigns.
+        Integration with content generation: when generate_calendar runs, it checks
+        for active campaigns and injects campaign posts.
+      acceptance_criteria:
+        - "Campaign creates correct On Ramp/EVENT/Off Ramp dates"
+        - "Active campaigns detected based on current date"
+        - "Campaign posts injected into content calendar"
+        - "Campaign stored in client profile"
+        - "python -m pytest tests/test_campaigns.py -v passes"
+      test_command: "python -m pytest tests/test_campaigns.py -v"
+      depends_on: ["S-004"]
+      passes: false
+
+    - id: "S-006"
+      priority: 6
+      title: "Agent framework and Platform Watchdog"
+      description: |
+        Implement herd/agents/ module:
+        base.py — BaseAgent class with: load_instructions() reads from
+        knowledge/agents/{name}.md, run() executes agent process, log_run()
+        appends to run log table in agent file. Uses Claude for research/analysis.
+        platform_watchdog.py — PlatformWatchdogAgent(BaseAgent):
+        For each platform in knowledge/platforms/, researches current algorithm
+        signals, content specs, best practices, posting strategy, hashtag strategy.
+        Uses Claude to synthesize findings into updated playbook format.
+        Writes updated content to platform playbook files.
+        models.py — AgentRunResult, AgentStatus, AgentRunLog.
+        router.py — POST /api/agents/{agent_name}/run, GET /api/agents/status.
+        Register router in main.py.
+      acceptance_criteria:
+        - "BaseAgent loads instructions and logs runs"
+        - "Platform Watchdog updates platform playbook files"
+        - "Agent run results returned with summary"
+        - "GET /api/agents/status returns all agent statuses"
+        - "python -m pytest tests/test_agents.py -v passes"
+      test_command: "python -m pytest tests/test_agents.py -v"
+      depends_on: ["S-001"]
+      passes: false
+
+    - id: "S-007"
+      priority: 7
+      title: "Trend Scout and Seasonal Planner agents"
+      description: |
+        Implement herd/agents/trend_scout.py — TrendScoutAgent(BaseAgent):
+        Scans for trending content formats, sounds, topics across platforms.
+        Updates knowledge/pulse/weekly-trends.md and knowledge/pulse/trending-formats.md.
+        Uses Claude to analyze trend relevance for business content.
+        Implement herd/agents/seasonal_planner.py — SeasonalPlannerAgent(BaseAgent):
+        Maintains rolling 90-day calendar of holidays, industry events, cultural moments.
+        Updates knowledge/pulse/seasonal-calendar.md.
+        For events in next 30 days, generates On Ramp/EVENT/Off Ramp skeletons.
+        Uses Claude to identify relevant dates for each client's industry/location.
+      acceptance_criteria:
+        - "Trend Scout updates weekly-trends.md and trending-formats.md"
+        - "Seasonal Planner updates seasonal-calendar.md"
+        - "Both agents log runs correctly"
+        - "Agents accessible via POST /api/agents/{name}/run"
+        - "python -m pytest tests/test_agents.py -v passes"
+      test_command: "python -m pytest tests/test_agents.py -v"
+      depends_on: ["S-006"]
+      passes: false
+
+    - id: "S-008"
+      priority: 8
+      title: "Industry Analyst agent"
+      description: |
+        Implement herd/agents/industry_analyst.py — IndustryAnalystAgent(BaseAgent):
+        For each active industry in knowledge/industries/, researches current
+        top-performing content types, platform priorities, common pillars,
+        seasonal calendar, competitor patterns.
+        Uses Claude to analyze and synthesize findings.
+        Updates industry guide files with current best practices.
+        Can create new industry guide from template when new industry needed.
+        Accepts optional industry parameter to analyze a specific vertical.
+      acceptance_criteria:
+        - "Industry Analyst updates industry guide files"
+        - "Can create new industry from template"
+        - "Agent logs runs with industries reviewed"
+        - "python -m pytest tests/test_agents.py -v passes"
+      test_command: "python -m pytest tests/test_agents.py -v"
+      depends_on: ["S-006"]
+      passes: false
+
+    - id: "S-009"
+      priority: 9
+      title: "Delivery system"
+      description: |
+        Implement herd/delivery/ module:
+        formatter.py — ContentFormatter class:
+        to_markdown(calendar) — formats ContentCalendar as a clean, copy-paste-ready
+        markdown document organized by day, with each post showing platform, caption,
+        hashtags, visual suggestion, and posting time.
+        to_summary(calendar) — generates executive summary of the week's strategy.
+        models.py — DeliveryResult, DeliveryFormat.
+        store.py — save deliveries to {HERD_DATA_DIR}/deliveries/{slug}/{date}.md.
+        router.py — POST /api/delivery/{slug}/send,
+        GET /api/delivery/{slug}/history.
+        Register router in main.py.
+      acceptance_criteria:
+        - "Markdown output is clean and copy-paste ready"
+        - "Summary includes strategy rationale"
+        - "Deliveries stored with date stamps"
+        - "History endpoint returns past deliveries"
+        - "python -m pytest tests/test_delivery.py -v passes"
+      test_command: "python -m pytest tests/test_delivery.py -v"
+      depends_on: ["S-004"]
+      passes: false
+
+    - id: "S-010"
+      priority: 10
+      title: "Dashboard and knowledge browser"
+      description: |
+        Implement dashboard and knowledge browsing:
+        herd/dashboard.py — DashboardService:
+        get_overview() — aggregates: total_clients, clients_by_phase {1:n, 2:n, 3:n, 4:n},
+        clients_by_tier, content_generated_this_week, total_posts_this_month,
+        agent_statuses (last run times), cost_summary (from usage tracker).
+        herd/knowledge.py additions — browse(category) returns list of files with
+        title, last_updated, content_preview for a knowledge category.
+        Router additions: GET /api/dashboard, GET /api/knowledge/{category}.
+      acceptance_criteria:
+        - "Dashboard returns aggregated stats across all clients"
+        - "Knowledge browser lists files by category"
+        - "Agent statuses included in dashboard"
+        - "python -m pytest tests/test_dashboard.py -v passes"
+      test_command: "python -m pytest tests/test_dashboard.py -v"
+      depends_on: ["S-002", "S-006"]
+      passes: false
+
+    - id: "S-011"
+      priority: 11
+      title: "Usage tracker and cost controls"
+      description: |
+        Implement herd/usage.py — UsageTracker (singleton):
+        Track per-client and total: API calls, input/output tokens, cost.
+        Sliding-window rate limiter (configurable calls per minute).
+        Budget alerts at 80% of monthly limit.
+        Per-client cost tracking against $5/month target.
+        GET /api/usage/stats — returns usage summary.
+        GET /api/usage/clients/{slug} — returns per-client usage.
+        Integrate tracker into content engine and all agent Claude calls.
+      acceptance_criteria:
+        - "Token and cost counters increment on API calls"
+        - "Per-client cost tracked separately"
+        - "Rate limiter blocks when window exceeded"
+        - "Budget alert at 80% threshold"
+        - "python -m pytest tests/test_usage.py -v passes"
+      test_command: "python -m pytest tests/test_usage.py -v"
+      depends_on: ["S-001"]
+      passes: false
+
+    - id: "S-012"
+      priority: 12
+      title: "Integration test suite"
+      description: |
+        Write integration tests exercising full request lifecycles:
+        1. Client intake -> profile creation -> strategy context assembly
+        2. Content generation with mocked Claude -> QA validation -> calendar storage
+        3. Campaign creation -> injection into content calendar
+        4. Agent run -> knowledge base update -> verify updated content
+        5. Delivery formatting -> stored output
+        6. Dashboard aggregation across multiple clients
+        7. Full pipeline: create client -> generate content -> deliver
+        Use httpx AsyncClient with mocked Anthropic API.
+      acceptance_criteria:
+        - "All module tests pass"
+        - "Integration tests cover cross-module flows"
+        - "No skipped tests"
+        - "python -m pytest tests/ -v passes with 0 failures"
+      test_command: "python -m pytest tests/ -v"
+      depends_on: ["S-001", "S-002", "S-003", "S-004", "S-005", "S-006", "S-007", "S-008", "S-009", "S-010", "S-011"]
+      passes: false
+
+    - id: "S-013"
+      priority: 13
+      title: "Frontend — Vite + React scaffold with TRON theme"
+      description: |
+        Initialize Vite + React 18 + TypeScript frontend in frontend/:
+        package.json, tsconfig.json, vite.config.ts (proxy /api to localhost:8002).
+        TRON theme system (reuse Coop pattern): ThemeProvider with CSS custom properties,
+        tron.ts defaults (dark bg #050510, Orbitron/Rajdhani/Share Tech Mono fonts,
+        cyan primary #00a6cf, orange accent #ff3b5c, glow effects, scanlines).
+        Shared UI components: Panel, Button, Input, Select, Toggle, StatBox,
+        ProgressBar, Badge, Table, Modal, Tabs.
+        Config system with public/config.json for customization.
+        App.tsx with sidebar navigation: Dashboard, Clients, Content, Knowledge, Agents.
+        Update main.py to serve frontend/dist/ with SPA fallback.
+      acceptance_criteria:
+        - "Vite builds successfully"
+        - "TRON theme renders with correct fonts and colors"
+        - "UI components render correctly"
+        - "Sidebar navigation works"
+        - "SPA fallback serves index.html for all non-API routes"
+        - "cd frontend && npx vitest run passes"
+      test_command: "cd frontend && npx vitest run"
+      depends_on: ["S-001"]
+      passes: false
+
+    - id: "S-014"
+      priority: 14
+      title: "Frontend — Client dashboard, content calendar, and agent UI"
+      description: |
+        Build frontend pages and widgets:
+        1. Dashboard page: overview stats (clients by phase/tier, content generated,
+           agent statuses, cost summary), charts/progress bars.
+        2. Clients page: client list with phase badges, click to view/edit profile,
+           intake form for new client creation, phase evaluation trigger.
+        3. Content page: weekly calendar view showing posts by day, click post to
+           view/edit, generate button triggers content creation for selected client,
+           QA warnings displayed, campaign timeline visualization.
+        4. Knowledge page: browse frameworks/platforms/industries/pulse by category,
+           view full content of any knowledge file.
+        5. Agents page: agent status cards with last run time, trigger buttons,
+           run history log.
+        All pages fetch from backend API. Loading/error states handled.
+        Responsive layout for desktop use.
+      acceptance_criteria:
+        - "Dashboard displays aggregated stats"
+        - "Client list and profile editing works"
+        - "Content calendar displays posts with edit capability"
+        - "Knowledge browser shows all categories"
+        - "Agent status and trigger buttons work"
+        - "cd frontend && npx vitest run passes"
+      test_command: "cd frontend && npx vitest run"
+      depends_on: ["S-012", "S-013"]
+      passes: false
