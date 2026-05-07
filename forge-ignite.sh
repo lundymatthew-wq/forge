@@ -322,31 +322,75 @@ fi
 
 inf "Updating Notion Registry row $REGISTRY_PAGE_ID → Ignited"
 
-# Notion API: PATCH /v1/pages/{page_id}
-# Sets Build State = Ignited, appends a Notes line.
-notes_append="Ignited via forge-ignite.sh on ${ISO_TS} (Spec ${SPEC_ID})"
+# jq is required for safe JSON construction and Notes-append semantics.
+if ! command -v jq >/dev/null 2>&1; then
+  err "jq is required for Notion writeback (sudo apt install jq, brew install jq, etc.)"
+  err "Or pass --no-notion to skip writeback and flip the row by hand."
+  exit 3
+fi
 
+# Step 1: GET the existing page to read current Notes and Spec ID.
+get_response=$(curl -sS \
+  -X GET "https://api.notion.com/v1/pages/${REGISTRY_PAGE_ID}" \
+  -H "Authorization: Bearer ${NOTION_FORGE_TOKEN}" \
+  -H "Notion-Version: 2022-06-28" 2>&1) || {
+    err "Failed to GET Notion page ${REGISTRY_PAGE_ID}"
+    exit 3
+  }
+
+# Detect API error response (Notion returns object with type:"error" on failure).
+if echo "$get_response" | jq -e '.object == "error"' >/dev/null 2>&1; then
+  err "Notion API error on GET: $(echo "$get_response" | jq -r '.message // "unknown"')"
+  exit 3
+fi
+
+# Step 2: Safety check — Spec ID on the row must match (or be empty).
+existing_spec_id=$(echo "$get_response" | jq -r '.properties."Spec ID".rich_text[0].text.content // ""')
+if [[ -n "$existing_spec_id" && "$existing_spec_id" != "$SPEC_ID" ]]; then
+  err "Spec ID mismatch — row $REGISTRY_PAGE_ID has '$existing_spec_id' but --spec-id is '$SPEC_ID'"
+  err "Refusing to write to wrong row. Verify --registry-row points to the correct project."
+  exit 3
+fi
+
+# Step 3: Read existing Notes and prepare append.
+existing_notes=$(echo "$get_response" | jq -r '.properties.Notes.rich_text | map(.text.content) | join("")')
+new_line="Ignited via forge-ignite.sh on ${ISO_TS} (Spec ${SPEC_ID})"
+if [[ -n "$existing_notes" ]]; then
+  combined_notes="${existing_notes}"$'\n'"${new_line}"
+else
+  combined_notes="${new_line}"
+fi
+
+# Step 4: Build PATCH payload using jq for safe JSON encoding.
+payload=$(jq -n \
+  --arg build_state "Ignited" \
+  --arg repo_url    "$REPO_URL" \
+  --arg notes       "$combined_notes" \
+  --arg spec_id     "$SPEC_ID" \
+  '{
+    properties: {
+      "Build State": { select: { name: $build_state } },
+      "Repo URL":    { url: $repo_url },
+      "Notes":       { rich_text: [{ type: "text", text: { content: $notes } }] },
+      "Spec ID":     { rich_text: [{ type: "text", text: { content: $spec_id } }] }
+    }
+  }')
+
+# Step 5: PATCH the page.
 http_code=$(curl -sS -o /tmp/forge-ignite-notion.json -w "%{http_code}" \
   -X PATCH "https://api.notion.com/v1/pages/${REGISTRY_PAGE_ID}" \
   -H "Authorization: Bearer ${NOTION_FORGE_TOKEN}" \
   -H "Notion-Version: 2022-06-28" \
   -H "Content-Type: application/json" \
-  -d "$(cat <<JSON
-{
-  "properties": {
-    "Build State": { "select": { "name": "Ignited" } },
-    "Repo URL": { "url": "${REPO_URL}" },
-    "Notes": { "rich_text": [{ "type": "text", "text": { "content": "${notes_append}" } }] }
-  }
-}
-JSON
-)" 2>&1) || true
+  --data "$payload")
 
 if [[ "$http_code" == "200" ]]; then
-  ok "Notion Registry row updated to Ignited"
+  ok "Notion Registry row updated: Build State=Ignited, Notes appended"
 else
   err "Notion API returned HTTP $http_code"
   err "Response saved to /tmp/forge-ignite-notion.json"
+  err "Payload sent: (saved to /tmp/forge-ignite-payload.json)"
+  echo "$payload" > /tmp/forge-ignite-payload.json
   exit 3
 fi
 
