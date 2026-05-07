@@ -1,0 +1,145 @@
+# Stop Conditions — {{PROJECT_NAME}}
+
+**Spec ID:** {{SPEC_ID}}
+
+The off-switches. When any of these fire, RALPH halts the loop and surfaces to a human.
+
+---
+
+## Configuration
+
+| Knob | Value | Source |
+|---|---|---|
+| `iteration_cap` | {{ITERATION_CAP}} | `forge-defaults.yaml` (override per project) |
+| `cost_cap_usd` | {{COST_CAP_USD}} | `forge-defaults.yaml` (override per project) |
+| `notion_retry_limit` | 3 | Hardcoded |
+
+---
+
+## The Six Conditions
+
+### 1. Success
+
+**Trigger:** All `verifier.md` checks pass.
+
+**RALPH does:**
+- Commits final iteration changes
+- Writes `.ralph-state.json` with `last_verifier_result: "pass"` and final iteration count
+- Updates Registry row: `Build State: QA Gate`, `QA Gate Status: In Review`, append Notes "Build complete, ready for review"
+- Exits cleanly (exit code 0)
+
+**Human intervention required:** Yes — review the build and flip the Registry row to `Shipped / Passed`.
+
+---
+
+### 2. Iteration Cap
+
+**Trigger:** {{ITERATION_CAP}} consecutive iterations without verifier progress (no new acceptance criteria checked off, no reduction in failing checks).
+
+**RALPH does:**
+- Commits any in-progress changes (do not lose work)
+- Writes `.ralph-state.json` with the last 3 iteration summaries
+- Updates Registry row: `Build State: Paused`, append Notes "Iteration cap hit at N=[count]; last failing check: [check_id]"
+- Exits with code 1
+
+**Human intervention required:** Yes — diagnose why progress stalled. Common causes: PRD ambiguity, missing dependency, wrong tech stack choice. Fix and re-ignite.
+
+---
+
+### 3. Cost Cap
+
+**Trigger:** Cumulative API cost (tracked in `.ralph-state.json`) exceeds `{{COST_CAP_USD}}` USD.
+
+**RALPH self-tracks:** Each Anthropic API response includes `usage.input_tokens` and `usage.output_tokens`. RALPH multiplies by current per-token rates and adds to `cumulative_cost_usd` in `.ralph-state.json` after every call. **No reliance on the Anthropic dashboard.**
+
+**RALPH does:**
+- Commits any in-progress changes
+- Writes `.ralph-state.json` with cumulative cost breakdown
+- Updates Registry row: `Build State: Paused`, append Notes "Cost cap hit: $[cumulative]/$[cap]. Iterations: [count]"
+- Exits with code 1
+
+**Human intervention required:** Yes — re-ignite with a higher cap (override in `forge-defaults.yaml`) or with a tightened spec.
+
+---
+
+### 4. Schema / Contract Drift
+
+**Trigger:** RALPH detects that `PRD.md § Acceptance Criteria` was modified after ignition. Detection: SHA-256 of the section is recorded in `.ralph-state.json` at first iteration; mismatch on subsequent iterations triggers the condition.
+
+**RALPH does:**
+- Does NOT commit any in-progress changes (drift means the work is on shifting ground)
+- Writes `.ralph-state.json` with `drift_detected: true` and the mismatching hashes
+- Updates Registry row: `Build State: Paused`, append Notes "Spec drift detected — re-ignite required. Old hash: [a], new hash: [b]"
+- Exits with code 2
+
+**Human intervention required:** Yes — re-ignite. Spec changes mid-loop break the verifier contract; the loop must restart from a stable spec.
+
+---
+
+### 5. Hard Error
+
+**Trigger:** Any of:
+- Uncaught exception in the loop runner itself
+- Infrastructure failure (Claude API down, Git remote unreachable, file system error)
+- Auth failure (Anthropic, Notion, GitHub)
+- Verifier itself broken (command not found, parse error in `verifier.md`)
+- Repo in dirty state at loop start (uncommitted changes RALPH didn't make)
+
+**RALPH does:**
+- Logs full error to `.ralph-state.json` and stderr
+- Does NOT attempt to "fix" itself — hard errors are operator-facing
+- Updates Registry row: `Build State: Paused`, append Notes "Hard error: [type] — [message]"
+- Exits with code 3
+
+**Human intervention required:** Yes — diagnose and fix the underlying issue. Common cases:
+- Auth expired → refresh tokens
+- Verifier broken → fix `verifier.md` syntax
+- Dirty repo → commit or stash before re-igniting
+
+---
+
+### 6. Human Override
+
+**Trigger:** File `.ralph-stop` exists in the repo root.
+
+**Why this design:**
+- Single-file drop, no directory traversal needed
+- Dotfile prefix keeps it out of normal listings but discoverable in any debug session (`ls -la`)
+- Works whether or not RALPH is mid-iteration — checked at the top of every loop pass
+
+**RALPH does:**
+- Commits any in-progress changes (preserve work)
+- Writes `.ralph-state.json` with `stopped_by: "human_override"`
+- Updates Registry row: `Build State: Paused`, append Notes "Stopped by human override (.ralph-stop)"
+- Exits with code 0 (this is intentional, not an error)
+
+**Human intervention required:** Yes — remove `.ralph-stop` to allow re-ignition.
+
+---
+
+## Restart Protocol
+
+For any condition other than #1 (Success):
+
+1. Diagnose root cause (read `.ralph-state.json`, recent git log, last iteration's verifier output)
+2. Fix the underlying issue (PRD edit, infra fix, code change)
+3. If PRD changed → re-run `forge-ignite.sh` (full re-ignition, fresh state)
+4. If only infra/code fixed → remove `.ralph-stop` (if present), restart loop manually
+5. Registry row goes from `Paused` back to `Manufacturing` on restart
+
+---
+
+## What RALPH Never Does on Stop
+
+- Does not delete `.ralph-state.json` (preserves diagnostic info across restarts)
+- Does not force-push or rewrite git history
+- Does not modify the PRD, verifier, or this stop-conditions file
+- Does not write to Registry fields outside its allow-list (see `CLAUDE.md § Update Protocol`)
+
+---
+
+## Changelog
+
+| Version | Date | Change | Author |
+|---|---|---|---|
+| v1.0 | {{ISO_DATE}} | Generated by FORGE | {{AUTHOR}} |

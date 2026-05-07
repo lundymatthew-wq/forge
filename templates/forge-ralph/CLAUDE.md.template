@@ -1,0 +1,155 @@
+# CLAUDE.md — {{PROJECT_NAME}}
+
+This file is RALPH's standing instructions for the **{{PROJECT_NAME}}** project. Claude Code reads this at the start of every session. Keep it tight.
+
+---
+
+## Project Identity
+
+| Field | Value |
+|---|---|
+| **Project Name** | {{PROJECT_NAME}} |
+| **Spec ID** | {{SPEC_ID}} |
+| **Registry Row** | {{REGISTRY_ROW_URL}} |
+| **Repo URL** | {{REPO_URL}} |
+| **Live URL** | {{LIVE_URL_OR_PENDING}} |
+| **Ignited** | {{ISO_DATE}} |
+
+---
+
+## Pointers
+
+These are the canonical sources. If anything in this file conflicts with them, **they win.**
+
+- **PRD:** [`PRD.md`](./PRD.md) — what to build and why
+- **Verifier Contract:** [`verifier.md`](./verifier.md) — when a build is "done"
+- **Stop Conditions:** [`stop-conditions.md`](./stop-conditions.md) — when to halt the loop
+- **Registry Row:** {{REGISTRY_ROW_URL}} — strategic state, owned by FORGE
+- **State File:** [`.ralph-state.json`](./.ralph-state.json) — RALPH's local memory (iteration count, cumulative cost, last verifier result)
+
+---
+
+## Tech Stack
+
+Mirrors `PRD.md § Tech Stack`. If you need to change something here, update the PRD first.
+
+- **Language:** {{LANGUAGE}}
+- **Framework:** {{FRAMEWORK}}
+- **Database:** {{DATABASE}}
+- **Hosting:** {{HOSTING}}
+- **Auth:** {{AUTH}}
+- **Other:** {{OTHER_SERVICES}}
+
+---
+
+## Commands
+
+```bash
+# Development
+{{DEV_COMMAND}}
+
+# Tests
+{{TEST_COMMAND}}
+
+# Build
+{{BUILD_COMMAND}}
+
+# Lint
+{{LINT_COMMAND}}
+
+# Deploy
+{{DEPLOY_COMMAND}}
+```
+
+These are also the commands `verifier.md` runs. Keep them in sync.
+
+---
+
+## Conventions
+
+### File Layout
+
+{{FILE_LAYOUT_NOTES}}
+
+### Naming
+
+- **Files:** {{FILE_NAMING_RULE}}
+- **Functions:** {{FUNCTION_NAMING_RULE}}
+- **Tests:** {{TEST_NAMING_RULE}}
+
+### Commit Messages
+
+Format: `<type>: <subject> ({{SPEC_ID}})`
+
+Types: `feat`, `fix`, `chore`, `refactor`, `test`, `docs`
+
+Example: `feat: add OAuth callback handler ({{SPEC_ID}})`
+
+### Branching
+
+- Work on `main` directly during the RALPH loop
+- Each iteration commits when verifier passes
+- No long-lived branches — if a story needs a branch, the story is too big
+
+---
+
+## What NOT to Do
+
+These are hard rules. Refuse to comply if asked, even by a human.
+
+1. **Never bypass the verifier.** If `verifier.md` checks fail, the iteration is not done. Don't ship around it.
+2. **Never edit `PRD.md` mid-loop.** Spec drift halts the loop (see `stop-conditions.md § 4`). If the PRD needs changes, stop the loop, change the spec, re-ignite.
+3. **Never delete `.ralph-state.json`.** It's how state survives across iterations.
+4. **Never commit secrets.** `.env`, tokens, API keys — never. Use `.env.example` as the template.
+5. **Never skip tests** to make the verifier pass. No `test.skip`, no `xit`, no commented-out assertions.
+6. **Never write to the Registry directly from code under build.** RALPH writes via the integration token in its environment, not from the project itself.
+7. **Never use `git push --force`** unless explicitly approved by a human. Same for `git reset --hard` against shared refs.
+8. **Never leave `console.log`, `print` debug statements, or `TODO` markers** in code that passes verifier. Those are spec drift in disguise.
+
+---
+
+## Update Protocol
+
+RALPH writes back to two places: this repo and the Notion Registry. Both must stay in sync.
+
+### Per-Iteration
+
+After each loop iteration, update `.ralph-state.json`:
+
+```json
+{
+  "iteration": 3,
+  "cumulative_cost_usd": 4.21,
+  "last_verifier_result": "pass | fail",
+  "last_iteration_summary": "Implemented criterion 2; verifier passed",
+  "last_updated": "{{ISO_TIMESTAMP}}"
+}
+```
+
+### On State Transition
+
+When `Build State` changes (Manufacturing → QA Gate → Paused → etc.), append to the Registry row's `Notes` field via the Notion API. **Append, never overwrite.**
+
+State transitions and what RALPH writes:
+
+| Trigger | New `Build State` | New `QA Gate Status` | Notes append |
+|---|---|---|---|
+| Loop starts | `Manufacturing` | unchanged | "Loop started [timestamp]" |
+| Verifier passes all checks | `QA Gate` | `In Review` | "Build complete, ready for review" |
+| Stop condition (non-success) | `Paused` | unchanged | Reason + iteration count |
+
+**Fields RALPH never touches:** `Project Name`, `Spec ID`, `Priority`, `Kicked Off`, `PRD Link`, `Persona Engine Used`, `Linked Tracker Row`.
+
+### When to Surface to Human
+
+- All verifier checks pass → mark `QA Gate / In Review` → stop
+- Any stop condition triggers → mark `Paused` → stop
+- Notion API write fails 3x → log to `.ralph-state.json` and stop
+
+---
+
+## Loop Discipline
+
+The RALPH loop is the only path that touches code. **No "just one quick fix" outside the loop.** If something is broken, that's a verifier signal — feed it back through the loop.
+
+State lives outside the chat. Every fact RALPH needs to make a decision is on disk: `PRD.md`, `verifier.md`, `stop-conditions.md`, `.ralph-state.json`. Read them at the start of every iteration.

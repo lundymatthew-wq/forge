@@ -1,0 +1,100 @@
+# PRD — {{PROJECT_NAME}}
+
+**Spec ID:** {{SPEC_ID}}
+**Registry Row:** {{REGISTRY_ROW_URL}}
+**Generated:** {{ISO_TIMESTAMP}}
+**FORGE Version:** {{FORGE_VERSION}}
+
+---
+
+## Problem
+
+{{ONE_PARAGRAPH_PROBLEM_STATEMENT}}
+
+What's broken or missing today. Concrete, observable. No solution language here.
+
+---
+
+## Goal
+
+{{ONE_TO_THREE_SENTENCE_GOAL}}
+
+What "done" looks like. If RALPH can't tell whether a build matches this goal, the goal isn't sharp enough yet.
+
+---
+
+## Non-goals
+
+- {{NON_GOAL_1}}
+- {{NON_GOAL_2}}
+- {{NON_GOAL_3}}
+
+What we're explicitly not building. Anti-scope-creep insurance.
+
+---
+
+## Users
+
+{{ONE_PARAGRAPH_USER_DESCRIPTION}}
+
+Who this is for. Link Persona Engine output here if used:
+
+**Persona Engine Output:** {{PERSONA_LINK_OR_NA}}
+
+---
+
+## Acceptance Criteria
+
+RALPH treats this list as the verifier input. Every item must be testable.
+
+1. {{CRITERION_1_TESTABLE}}
+2. {{CRITERION_2_TESTABLE}}
+3. {{CRITERION_3_TESTABLE}}
+
+**Rules:**
+- Every criterion is verifiable by running a command, reading a file, or running a test
+- No subjective criteria ("feels good," "looks nice") — replace with measurable equivalents
+- Numbered, not bulleted, so verifier.md can reference them by number
+
+---
+
+## Tech Stack
+
+- **Language:** {{LANGUAGE}}
+- **Framework:** {{FRAMEWORK}}
+- **Database:** {{DATABASE}}
+- **Hosting:** {{HOSTING}}
+- **Auth:** {{AUTH}}
+- **Other:** {{OTHER_SERVICES}}
+
+This list is canonical. `CLAUDE.md` mirrors it; if they diverge, this wins.
+
+---
+
+## Out of Scope
+
+- {{OUT_OF_SCOPE_1}}
+- {{OUT_OF_SCOPE_2}}
+- {{OUT_OF_SCOPE_3}}
+
+Explicit deferrals. Things that might seem in-scope but aren't, with a one-line reason each.
+
+---
+
+## Open Questions
+
+<!--
+HARD RULE: This section MUST be empty before ignition.
+If any question lives here, the project stays in `Spec Drafting`.
+RALPH refuses to start while open questions exist.
+-->
+
+(none)
+
+---
+
+## Changelog
+
+| Version | Date | Change | Author |
+|---|---|---|---|
+| v1.0 | {{ISO_DATE}} | Initial draft | {{AUTHOR}} |
