@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Request a Quote — Machine Shop</title>
+<style>
+  :root {
+    /* Brand tokens — swap these to rebrand. */
+    --bg:        #14181d;
+    --surface:   #1c222a;
+    --surface-2: #232b35;
+    --border:    #313b47;
+    --text:      #e8edf2;
+    --text-dim:  #9aa7b4;
+    --accent:    #ff6a13;   /* safety orange */
+    --accent-2:  #ff8742;
+    --error:     #ff5a5a;
+    --ok:        #38c172;
+    --radius:    10px;
+    --maxw:      720px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    padding: 32px 16px;
+  }
+
+  .card {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .header {
+    padding: 28px 28px 22px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--surface-2), var(--surface));
+  }
+  .header h1 { margin: 0 0 6px; font-size: 1.5rem; letter-spacing: .3px; }
+  .header h1 .accent { color: var(--accent); }
+  .header p { margin: 0; color: var(--text-dim); font-size: .95rem; }
+
+  form { padding: 24px 28px 28px; }
+
+  .row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .row .field { flex: 1 1 240px; }
+
+  .field { margin-bottom: 18px; }
+  label {
+    display: block;
+    font-size: .82rem;
+    font-weight: 600;
+    letter-spacing: .3px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+  label .req { color: var(--accent); }
+
+  input, select, textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font: inherit;
+    padding: 11px 12px;
+    transition: border-color .15s ease;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  textarea { resize: vertical; min-height: 90px; }
+  select { appearance: none; cursor: pointer; }
+
+  /* Dropzone */
+  .dropzone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 26px 18px;
+    text-align: center;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .dropzone.drag { border-color: var(--accent); background: var(--surface-2); }
+  .dropzone strong { color: var(--text); }
+  .dropzone .browse { color: var(--accent); text-decoration: underline; }
+  .hint { font-size: .8rem; color: var(--text-dim); margin-top: 8px; }
+
+  .filelist { margin-top: 12px; list-style: none; padding: 0; }
+  .filelist li {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    font-size: .9rem;
+  }
+  .filelist .size { color: var(--text-dim); font-size: .8rem; white-space: nowrap; }
+  .filelist .remove {
+    background: none; border: none; color: var(--error);
+    cursor: pointer; font-size: 1.1rem; line-height: 1; padding: 0 4px;
+  }
+
+  .submit-btn {
+    width: 100%;
+    margin-top: 6px;
+    padding: 14px;
+    background: var(--accent);
+    color: #1a1207;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: .4px;
+    cursor: pointer;
+    transition: background .15s ease, opacity .15s ease;
+  }
+  .submit-btn:hover { background: var(--accent-2); }
+  .submit-btn:disabled { opacity: .6; cursor: not-allowed; }
+
+  .errorbox {
+    display: none;
+    margin-bottom: 18px;
+    padding: 12px 14px;
+    border: 1px solid var(--error);
+    border-radius: 8px;
+    background: rgba(255, 90, 90, .08);
+    color: var(--error);
+    font-size: .9rem;
+  }
+  .errorbox.show { display: block; }
+
+  .success {
+    display: none;
+    padding: 48px 28px;
+    text-align: center;
+  }
+  .success.show { display: block; }
+  .success .check {
+    width: 64px; height: 64px; margin: 0 auto 18px;
+    border-radius: 50%;
+    background: rgba(56, 193, 114, .12);
+    color: var(--ok);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2rem;
+  }
+  .success h2 { margin: 0 0 8px; }
+  .success p { color: var(--text-dim); margin: 0; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <h1>Request a <span class="accent">Quote</span></h1>
+      <p>Tell us about your part and upload your files. We'll get back to you with pricing and lead time.</p>
+    </div>
+
+    <!-- FORM -->
+    <form id="quoteForm" novalidate>
+      <div class="errorbox" id="errorBox"></div>
+
+      <div class="row">
+        <div class="field">
+          <label for="name">Full name <span class="req">*</span></label>
+          <input type="text" id="name" name="name" required autocomplete="name" />
+        </div>
+        <div class="field">
+          <label for="company">Company</label>
+          <input type="text" id="company" name="company" autocomplete="organization" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="email">Email <span class="req">*</span></label>
+          <input type="email" id="email" name="email" required autocomplete="email" />
+        </div>
+        <div class="field">
+          <label for="phone">Phone</label>
+          <input type="tel" id="phone" name="phone" autocomplete="tel" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="material">Material <span class="req">*</span></label>
+          <select id="material" name="material" required>
+            <option value="" selected disabled>Select…</option>
+            <option>Aluminum</option>
+            <option>Steel</option>
+            <option>Stainless</option>
+            <option>Brass</option>
+            <option>Titanium</option>
+            <option>Plastic / Delrin</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="quantity">Quantity <span class="req">*</span></label>
+          <input type="number" id="quantity" name="quantity" min="1" step="1" required />
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="dueDate">Needed by</label>
+          <input type="date" id="dueDate" name="dueDate" />
+        </div>
+        <div class="field">
+          <label for="processing">Processing <span class="req">*</span></label>
+          <select id="processing" name="processing" required>
+            <option value="" selected disabled>Select…</option>
+            <option>CNC Milling</option>
+            <option>CNC Turning</option>
+            <option>Laser Cutting</option>
+            <option>Welding</option>
+            <option>Finishing</option>
+            <option>Other</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="dimensions">Dimensions / tolerances</label>
+        <input type="text" id="dimensions" name="dimensions" placeholder="e.g. 120 × 80 × 25 mm, ±0.05" />
+      </div>
+
+      <div class="field">
+        <label>Files</label>
+        <div class="dropzone" id="dropzone">
+          <strong>Drag &amp; drop files here</strong> or <span class="browse">browse</span><br />
+          Drawings, STEP/CAD, photos — PDF, images, .step/.stp/.dxf, etc.
+        </div>
+        <div class="hint">
+          Total upload limit ~25&nbsp;MB. For larger files, paste a shareable Drive/Dropbox
+          link into "Anything else" below instead.
+        </div>
+        <input type="file" id="fileInput" multiple hidden />
+        <ul class="filelist" id="fileList"></ul>
+      </div>
+
+      <div class="field">
+        <label for="notes">Anything else</label>
+        <textarea id="notes" name="notes" placeholder="Project context, finish requirements, or a shareable link to large files…"></textarea>
+      </div>
+
+      <button type="submit" class="submit-btn" id="submitBtn">Send quote request</button>
+    </form>
+
+    <!-- SUCCESS SCREEN -->
+    <div class="success" id="successScreen">
+      <div class="check">✓</div>
+      <h2>Request sent</h2>
+      <p>Thanks — we've got your details and files. We'll be in touch shortly with pricing and lead time.</p>
+    </div>
+  </div>
+
+<script>
+  // ─── Config ────────────────────────────────────────────────────────────
+  // Paste your deployed Apps Script /exec URL here after deploy.
+  const SCRIPT_URL = "PASTE_APPS_SCRIPT_EXEC_URL_HERE";
+
+  const MAX_TOTAL_BYTES = 25 * 1024 * 1024; // ~25 MB upload guard
+  // ───────────────────────────────────────────────────────────────────────
+
+  const form          = document.getElementById('quoteForm');
+  const successScreen = document.getElementById('successScreen');
+  const errorBox      = document.getElementById('errorBox');
+  const submitBtn     = document.getElementById('submitBtn');
+  const dropzone      = document.getElementById('dropzone');
+  const fileInput     = document.getElementById('fileInput');
+  const fileListEl    = document.getElementById('fileList');
+
+  let selectedFiles = []; // File objects
+
+  // ─── File picker + drag & drop ───────────────────────────────────────────
+  dropzone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => { addFiles(fileInput.files); fileInput.value = ''; });
+
+  ['dragenter', 'dragover'].forEach(evt =>
+    dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.add('drag'); }));
+  ['dragleave', 'drop'].forEach(evt =>
+    dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.remove('drag'); }));
+  dropzone.addEventListener('drop', e => { if (e.dataTransfer) addFiles(e.dataTransfer.files); });
+
+  function addFiles(fileObjs) {
+    for (const f of fileObjs) selectedFiles.push(f);
+    renderFileList();
+  }
+
+  function removeFile(idx) {
+    selectedFiles.splice(idx, 1);
+    renderFileList();
+  }
+
+  function fmtSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+    return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+  }
+
+  function renderFileList() {
+    fileListEl.innerHTML = '';
+    selectedFiles.forEach((f, idx) => {
+      const li = document.createElement('li');
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = f.name;
+      const sizeSpan = document.createElement('span');
+      sizeSpan.className = 'size';
+      sizeSpan.textContent = fmtSize(f.size);
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'remove';
+      rm.textContent = '×';
+      rm.setAttribute('aria-label', 'Remove ' + f.name);
+      rm.addEventListener('click', () => removeFile(idx));
+      const right = document.createElement('span');
+      right.style.display = 'flex';
+      right.style.alignItems = 'center';
+      right.style.gap = '12px';
+      right.appendChild(sizeSpan);
+      right.appendChild(rm);
+      li.appendChild(nameSpan);
+      li.appendChild(right);
+      fileListEl.appendChild(li);
+    });
+  }
+
+  // ─── Helpers ──────────────────────────────────────────────────────────────
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.classList.add('show');
+    errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  function clearError() {
+    errorBox.textContent = '';
+    errorBox.classList.remove('show');
+  }
+
+  // Read a File as base64 (stripping the data: prefix).
+  function readAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result || '';
+        const comma = result.indexOf(',');
+        resolve(comma >= 0 ? result.slice(comma + 1) : result);
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function validate() {
+    const required = [
+      ['name', 'your name'],
+      ['email', 'your email'],
+      ['material', 'a material'],
+      ['quantity', 'a quantity'],
+      ['processing', 'a processing type']
+    ];
+    for (const [id, label] of required) {
+      const el = document.getElementById(id);
+      if (!el.value || !el.value.trim()) {
+        el.focus();
+        return 'Please provide ' + label + '.';
+      }
+    }
+    const email = document.getElementById('email').value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      document.getElementById('email').focus();
+      return 'Please enter a valid email address.';
+    }
+    return null;
+  }
+
+  // ─── Submit ────────────────────────────────────────────────────────────────
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearError();
+
+    const validationError = validate();
+    if (validationError) { showError(validationError); return; }
+
+    // File-size guard.
+    const totalBytes = selectedFiles.reduce((sum, f) => sum + f.size, 0);
+    if (totalBytes > MAX_TOTAL_BYTES) {
+      showError('Your files total ' + fmtSize(totalBytes) + ', over the ~25 MB limit. ' +
+        'Please paste a shareable Drive/Dropbox link into "Anything else" instead, ' +
+        'and remove the large files before sending.');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending…';
+
+    try {
+      const files = [];
+      for (const f of selectedFiles) {
+        files.push({
+          name: f.name,
+          mimeType: f.type || 'application/octet-stream',
+          dataB64: await readAsBase64(f)
+        });
+      }
+
+      const payload = {
+        name:       document.getElementById('name').value.trim(),
+        company:    document.getElementById('company').value.trim(),
+        email:      document.getElementById('email').value.trim(),
+        phone:      document.getElementById('phone').value.trim(),
+        material:   document.getElementById('material').value,
+        quantity:   document.getElementById('quantity').value.trim(),
+        dueDate:    document.getElementById('dueDate').value,
+        dimensions: document.getElementById('dimensions').value.trim(),
+        processing: document.getElementById('processing').value,
+        notes:      document.getElementById('notes').value.trim(),
+        files: files
+      };
+
+      // CRITICAL (CORS): send a plain string body with NO custom headers so the
+      // browser treats this as a "simple request" and skips the OPTIONS preflight
+      // that Apps Script web apps cannot answer. Do NOT add a Content-Type header.
+      const res = await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+
+      // If reading the response proves unreliable after deploy, switch the fetch
+      // above to { method:"POST", body:..., mode:"no-cors" } and treat a
+      // non-throwing fetch as success (you won't be able to read res then).
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'The server reported an error.');
+
+      form.style.display = 'none';
+      successScreen.classList.add('show');
+
+    } catch (err) {
+      showError("We couldn't send your request right now. Please try again, or email us directly. (" +
+        (err && err.message ? err.message : err) + ")");
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Send quote request';
+    }
+  });
+</script>
+</body>
+</html>
