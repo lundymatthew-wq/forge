@@ -7,11 +7,26 @@
  * Deploy: Deploy > New deployment > Web app > Execute as: Me >
  *         Who has access: Anyone. Paste the /exec URL into SCRIPT_URL in the form.
  *
- * NOTE ON CORS: Apps Script web apps cannot answer a CORS preflight (OPTIONS).
- * The form avoids triggering one by sending a plain string body with no custom
- * headers (a "simple request"). Do NOT try to set response headers here to
- * "fix" CORS — that is the wrong layer and will not work.
+ * NOTE ON CORS: Apps Script web apps cannot answer a CORS preflight (OPTIONS) —
+ * the platform never routes OPTIONS to doPost/doGet, and you cannot set custom
+ * response headers, so there is NO server-side way to satisfy a preflight. The
+ * only reliable fix is on the form: send a plain string body with no custom
+ * headers (a "simple request"), which skips the preflight entirely. See
+ * INTEGRATION.md. The doGet() below is a health check so you can confirm the
+ * deployment is live independently of any form/CORS question.
  */
+
+/**
+ * Health check. Open the /exec URL in a browser (a GET) and you should see
+ * {"ok":true,"status":"alive"}. If this works but form POSTs don't, the problem
+ * is the form sending a non-simple request (a custom Content-Type header) and
+ * triggering a preflight — fix it on the form, not here.
+ */
+function doGet(e) {
+  return ContentService
+    .createTextOutput(JSON.stringify({ ok: true, status: 'alive' }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
 
 // ─── Config — fill these in ────────────────────────────────────────────────
 const FOLDER_ID    = 'PASTE_DRIVE_FOLDER_ID_HERE';   // Drive folder for uploads
