@@ -3,30 +3,36 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Request a Quote — Machine Shop</title>
+<title>Request a Quote — PWD Manufacturing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    /* Brand tokens — swap these to rebrand. */
-    --bg:        #14181d;
-    --surface:   #1c222a;
-    --surface-2: #232b35;
-    --border:    #313b47;
-    --text:      #e8edf2;
-    --text-dim:  #9aa7b4;
-    --accent:    #ff6a13;   /* safety orange */
-    --accent-2:  #ff8742;
-    --error:     #ff5a5a;
-    --ok:        #38c172;
-    --radius:    10px;
-    --maxw:      720px;
+    /* PWD Manufacturing brand tokens (Brand Guidelines, Edition 2025) */
+    --red:       #BE1E2D;   /* Primary Red */
+    --red-deep:  #921A24;   /* Deep Red — hovers/shadow */
+    --red-bright:#DA2140;   /* Bright Red — CTA */
+    --teal:      #14242D;   /* Dark Teal — text/anchor */
+    --gray-1:    #F2F2F2;
+    --gray-2:    #E8E8E8;
+    --muted:     #6B6B6B;
+    --white:     #FFFFFF;
+    --ok:        #1f8f4e;
+    --error:     #BE1E2D;
+
+    --display: "Oswald", "Arial Narrow", Arial, Helvetica, sans-serif;
+    --body:    "Roboto", Arial, Helvetica, sans-serif;
+    --radius:  8px;
+    --maxw:    720px;
   }
 
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--gray-1);
+    color: var(--teal);
+    font-family: var(--body);
     line-height: 1.5;
     padding: 32px 16px;
   }
@@ -34,22 +40,26 @@
   .card {
     max-width: var(--maxw);
     margin: 0 auto;
-    background: var(--surface);
-    border: 1px solid var(--border);
+    background: var(--white);
+    border: 1px solid var(--gray-2);
     border-radius: var(--radius);
     overflow: hidden;
+    box-shadow: 0 2px 16px rgba(20, 36, 45, .06);
   }
 
   .header {
-    padding: 28px 28px 22px;
-    border-bottom: 1px solid var(--border);
-    background: linear-gradient(180deg, var(--surface-2), var(--surface));
+    padding: 30px 28px 24px;
+    background: var(--teal);
+    border-bottom: 4px solid var(--red);
   }
-  .header h1 { margin: 0 0 6px; font-size: 1.5rem; letter-spacing: .3px; }
-  .header h1 .accent { color: var(--accent); }
-  .header p { margin: 0; color: var(--text-dim); font-size: .95rem; }
+  .header .eyebrow {
+    font-family: var(--display); text-transform: uppercase; letter-spacing: 2.5px;
+    color: var(--red-bright); font-weight: 600; font-size: .8rem; margin: 0 0 8px;
+  }
+  .header h1 { margin: 0 0 8px; font-family: var(--display); font-weight: 700; text-transform: uppercase; font-size: 1.7rem; color: var(--white); }
+  .header p { margin: 0; color: #cdd6db; font-size: .97rem; }
 
-  form { padding: 24px 28px 28px; }
+  form { padding: 26px 28px 28px; }
 
   .row { display: flex; gap: 16px; flex-wrap: wrap; }
   .row .field { flex: 1 1 240px; }
@@ -57,79 +67,84 @@
   .field { margin-bottom: 18px; }
   label {
     display: block;
+    font-family: var(--display);
     font-size: .82rem;
     font-weight: 600;
-    letter-spacing: .3px;
-    color: var(--text-dim);
+    letter-spacing: .6px;
+    color: var(--teal);
     margin-bottom: 6px;
     text-transform: uppercase;
   }
-  label .req { color: var(--accent); }
+  label .req { color: var(--red); }
 
   input, select, textarea {
     width: 100%;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text);
+    background: var(--white);
+    border: 1px solid #c4ccd1;
+    border-radius: var(--radius);
+    color: var(--teal);
     font: inherit;
+    font-family: var(--body);
     padding: 11px 12px;
-    transition: border-color .15s ease;
+    transition: border-color .15s ease, box-shadow .15s ease;
   }
   input:focus, select:focus, textarea:focus {
     outline: none;
-    border-color: var(--accent);
+    border-color: var(--red);
+    box-shadow: 0 0 0 3px rgba(190, 30, 45, .12);
   }
   textarea { resize: vertical; min-height: 90px; }
   select { appearance: none; cursor: pointer; }
 
   /* Dropzone */
   .dropzone {
-    border: 2px dashed var(--border);
+    border: 2px dashed #c4ccd1;
     border-radius: var(--radius);
     padding: 26px 18px;
     text-align: center;
-    color: var(--text-dim);
+    color: var(--muted);
     cursor: pointer;
     transition: border-color .15s ease, background .15s ease;
   }
-  .dropzone.drag { border-color: var(--accent); background: var(--surface-2); }
-  .dropzone strong { color: var(--text); }
-  .dropzone .browse { color: var(--accent); text-decoration: underline; }
-  .hint { font-size: .8rem; color: var(--text-dim); margin-top: 8px; }
+  .dropzone.drag { border-color: var(--red); background: var(--gray-1); }
+  .dropzone strong { color: var(--teal); }
+  .dropzone .browse { color: var(--red); text-decoration: underline; }
+  .hint { font-size: .8rem; color: var(--muted); margin-top: 8px; }
 
   .filelist { margin-top: 12px; list-style: none; padding: 0; }
   .filelist li {
     display: flex; align-items: center; justify-content: space-between;
     gap: 12px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
+    background: var(--gray-1);
+    border: 1px solid var(--gray-2);
+    border-radius: var(--radius);
     padding: 8px 12px;
     margin-bottom: 8px;
     font-size: .9rem;
   }
-  .filelist .size { color: var(--text-dim); font-size: .8rem; white-space: nowrap; }
+  .filelist .size { color: var(--muted); font-size: .8rem; white-space: nowrap; }
   .filelist .remove {
-    background: none; border: none; color: var(--error);
+    background: none; border: none; color: var(--red);
     cursor: pointer; font-size: 1.1rem; line-height: 1; padding: 0 4px;
   }
 
   .submit-btn {
     width: 100%;
     margin-top: 6px;
-    padding: 14px;
-    background: var(--accent);
-    color: #1a1207;
+    padding: 15px;
+    background: var(--red-bright);
+    color: var(--white);
     border: none;
-    border-radius: 8px;
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: .4px;
+    border-radius: var(--radius);
+    font-family: var(--display);
+    font-size: 1.05rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .8px;
     cursor: pointer;
     transition: background .15s ease, opacity .15s ease;
   }
-  .submit-btn:hover { background: var(--accent-2); }
+  .submit-btn:hover { background: var(--red-deep); }
   .submit-btn:disabled { opacity: .6; cursor: not-allowed; }
 
   .errorbox {
@@ -137,36 +152,38 @@
     margin-bottom: 18px;
     padding: 12px 14px;
     border: 1px solid var(--error);
-    border-radius: 8px;
-    background: rgba(255, 90, 90, .08);
-    color: var(--error);
+    border-left: 4px solid var(--error);
+    border-radius: var(--radius);
+    background: rgba(190, 30, 45, .06);
+    color: var(--red-deep);
     font-size: .9rem;
   }
   .errorbox.show { display: block; }
 
   .success {
     display: none;
-    padding: 48px 28px;
+    padding: 52px 28px;
     text-align: center;
   }
   .success.show { display: block; }
   .success .check {
-    width: 64px; height: 64px; margin: 0 auto 18px;
+    width: 66px; height: 66px; margin: 0 auto 18px;
     border-radius: 50%;
-    background: rgba(56, 193, 114, .12);
+    background: rgba(31, 143, 78, .12);
     color: var(--ok);
     display: flex; align-items: center; justify-content: center;
     font-size: 2rem;
   }
-  .success h2 { margin: 0 0 8px; }
-  .success p { color: var(--text-dim); margin: 0; }
+  .success h2 { margin: 0 0 8px; font-family: var(--display); text-transform: uppercase; color: var(--teal); }
+  .success p { color: var(--muted); margin: 0; }
 </style>
 </head>
 <body>
   <div class="card">
     <div class="header">
-      <h1>Request a <span class="accent">Quote</span></h1>
-      <p>Tell us about your part and upload your files. We'll get back to you with pricing and lead time.</p>
+      <p class="eyebrow">PWD Manufacturing</p>
+      <h1>Request a Quote</h1>
+      <p>Tell us about your part and upload your files. You bring the challenge — we build the solution.</p>
     </div>
 
     <!-- FORM -->
@@ -264,8 +281,8 @@
     <!-- SUCCESS SCREEN -->
     <div class="success" id="successScreen">
       <div class="check">✓</div>
-      <h2>Request sent</h2>
-      <p>Thanks — we've got your details and files. We'll be in touch shortly with pricing and lead time.</p>
+      <h2>Request Sent</h2>
+      <p>Thanks — we've got your details and files. The PWD team will be in touch shortly with pricing and a lead time.</p>
     </div>
   </div>
 

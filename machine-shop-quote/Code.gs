@@ -1,5 +1,5 @@
 /**
- * Machine Shop — Quote Request intake web app.
+ * PWD Manufacturing — Quote Request intake web app.
  *
  * Receives a JSON POST from quote-request.html, saves every uploaded file to a
  * Drive folder, appends a row to the Quotes sheet, and emails the shop an alert.
@@ -54,9 +54,9 @@ function doPost(e) {
 
     // 3. Email the shop an alert with all fields + links.
     const folderUrl = folder.getUrl();
-    const subject = 'New quote request — ' + name + ' (' + material + ' x' + quantity + ')';
+    const subject = 'PWD quote request — ' + name + ' (' + material + ' x' + quantity + ')';
     const bodyLines = [
-      'New quote request received.',
+      'New quote request received via the PWD Manufacturing website.',
       '',
       'Name:       ' + name,
       'Company:    ' + company,
