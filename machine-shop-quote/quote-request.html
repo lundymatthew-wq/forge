@@ -263,16 +263,23 @@
           Drawings, STEP/CAD, photos — PDF, images, .step/.stp/.dxf, etc.
         </div>
         <div class="hint">
-          Total upload limit ~25&nbsp;MB. For larger files, paste a shareable Drive/Dropbox
-          link into "Anything else" below instead.
+          Total upload limit ~25&nbsp;MB. For larger files, paste a shareable
+          Dropbox / Google&nbsp;Drive / WeTransfer link in the field below.
         </div>
         <input type="file" id="fileInput" multiple hidden />
         <ul class="filelist" id="fileList"></ul>
       </div>
 
       <div class="field">
+        <label for="largeFileLink">Link to large files</label>
+        <input type="url" id="largeFileLink" name="largeFileLink"
+               placeholder="https://dropbox.com/… or Google Drive / WeTransfer link" />
+        <div class="hint">Optional — use this for files over ~25&nbsp;MB instead of uploading.</div>
+      </div>
+
+      <div class="field">
         <label for="notes">Anything else</label>
-        <textarea id="notes" name="notes" placeholder="Project context, finish requirements, or a shareable link to large files…"></textarea>
+        <textarea id="notes" name="notes" placeholder="Project context, finish requirements, tolerances…"></textarea>
       </div>
 
       <button type="submit" class="submit-btn" id="submitBtn">Send quote request</button>
@@ -413,12 +420,14 @@
     const validationError = validate();
     if (validationError) { showError(validationError); return; }
 
-    // File-size guard.
+    // File-size guard → steer them to the "Link to large files" field.
+    const largeFileLink = document.getElementById('largeFileLink').value.trim();
     const totalBytes = selectedFiles.reduce((sum, f) => sum + f.size, 0);
-    if (totalBytes > MAX_TOTAL_BYTES) {
-      showError('Your files total ' + fmtSize(totalBytes) + ', over the ~25 MB limit. ' +
-        'Please paste a shareable Drive/Dropbox link into "Anything else" instead, ' +
-        'and remove the large files before sending.');
+    if (totalBytes > MAX_TOTAL_BYTES && !largeFileLink) {
+      showError('Your files total ' + fmtSize(totalBytes) + ', over the ~25 MB upload limit. ' +
+        'Remove the large files and paste a Dropbox / Google Drive / WeTransfer share link ' +
+        'into the "Link to large files" field instead.');
+      document.getElementById('largeFileLink').focus();
       return;
     }
 
@@ -446,6 +455,7 @@
         dimensions: document.getElementById('dimensions').value.trim(),
         processing: document.getElementById('processing').value,
         notes:      document.getElementById('notes').value.trim(),
+        largeFileLink: largeFileLink,
         files: files
       };
 

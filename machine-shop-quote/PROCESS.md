@@ -51,10 +51,11 @@ You need the two HTML files reachable at a public URL. **`Code.gs` is already
    or move the two HTML files to a `/docs` folder and serve from there.
 3. Site publishes at `https://<user>.github.io/<repo>/machine-shop-quote/index.html`.
 
-### Option C — Your existing site/host
-If `pwdmanufacturing.com` is already hosted somewhere, just upload the two HTML
-files via whatever you use (cPanel, FTP, your site builder's "upload HTML" / custom
-page). Link your site's "Request a Quote" button to `quote-request.html`.
+### Option C — Wix (the shop's site) ← see `WIX.md`
+The PWD site is on Wix. Wix doesn't run our form as a native page, but it embeds
+it cleanly. Recommended: host `quote-request.html` (Option A above) and drop it
+into the Wix page via **Add → Embed Code → Embed a Site** (iframe by URL). Full
+step-by-step (plus a paste-the-code option and a Velo option) is in **`WIX.md`**.
 
 ### After uploading — smoke test
 - Open the landing page; click **Get a Quote** → the form loads.

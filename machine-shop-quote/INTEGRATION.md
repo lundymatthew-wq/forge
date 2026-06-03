@@ -35,6 +35,7 @@ the backend reads these keys exactly and writes them to the sheet in this order:
   "dimensions": "120 x 80 x 25 mm, ±0.05",
   "processing": "CNC Milling",
   "notes":      "Anodized finish preferred",
+  "largeFileLink": "https://www.dropbox.com/s/...",
   "files": [
     { "name": "part.step", "mimeType": "application/step", "dataB64": "<base64>" }
   ]
@@ -42,9 +43,12 @@ the backend reads these keys exactly and writes them to the sheet in this order:
 ```
 
 **Sheet column order** (for reference — the backend handles this, do not send it):
-`timestamp · name · company · email · phone · material · quantity · dueDate · dimensions · processing · notes · fileLinks`
+`timestamp · name · company · email · phone · material · quantity · dueDate · dimensions · processing · notes · largeFileLink · uploadedFileLinks`
 
 - All text fields are optional except whatever you choose to validate client-side.
+- `largeFileLink` — an always-available text field for a Dropbox / Drive / WeTransfer
+  link. Used when files are too big to upload (see §5), but customers may fill it in
+  anytime. Send `""` if empty.
 - `files` is an array; send `[]` if none.
 - Each file: `name` (string), `mimeType` (string), `dataB64` (base64 **without**
   the `data:...;base64,` prefix).
@@ -119,9 +123,11 @@ function readAsBase64(file) {
 ## 5. File-size guard (required)
 
 Apps Script + base64 can't take unlimited payloads. Before posting, sum file sizes;
-if the total exceeds **~25 MB**, block the submit and tell the user to paste a
-shareable Drive/Dropbox link into the "Anything else" (`notes`) field instead.
-Put a one-line helper near the upload control noting the ~25 MB limit + link option.
+if the total exceeds **~25 MB**, block the submit and point the user to the
+always-visible **"Link to large files"** field (`largeFileLink`) — they paste a
+Dropbox / Google Drive / WeTransfer share link there instead of uploading.
+Keep that field visible at all times (with a one-line helper noting the ~25 MB
+upload limit and the link option), so it's available whether or not they hit the cap.
 
 ```js
 const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
@@ -149,14 +155,15 @@ Adapt the field reads to the branded markup; the request itself must stay as-is.
 
 ```js
 async function submitQuote(formData, selectedFiles) {
-  // formData = { name, company, email, phone, material, quantity, dueDate, dimensions, processing, notes }
+  // formData = { name, company, email, phone, material, quantity, dueDate,
+  //              dimensions, processing, notes, largeFileLink }
   // selectedFiles = array of File objects
 
-  // 25 MB guard
+  // 25 MB guard → send them to the "Link to large files" field instead.
   const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
   const total = selectedFiles.reduce((s, f) => s + f.size, 0);
-  if (total > MAX_TOTAL_BYTES) {
-    throw new Error("Files exceed ~25 MB. Paste a shareable Drive/Dropbox link in \"Anything else\" instead.");
+  if (total > MAX_TOTAL_BYTES && !formData.largeFileLink) {
+    throw new Error("Files exceed ~25 MB. Paste a Dropbox / Drive / WeTransfer link in the \"Link to large files\" field instead.");
   }
 
   // Encode files
