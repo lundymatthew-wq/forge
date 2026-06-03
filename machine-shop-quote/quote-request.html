@@ -4,485 +4,555 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Request a Quote — PWD Manufacturing</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
 <style>
+  /* ============================================================
+     PWD MANUFACTURING — BRAND TOKENS
+     Per brand guide (2025). Red-forward, dark-teal anchor.
+     ============================================================ */
   :root {
-    /* PWD Manufacturing brand tokens (Brand Guidelines, Edition 2025) */
-    --red:       #BE1E2D;   /* Primary Red */
-    --red-deep:  #921A24;   /* Deep Red — hovers/shadow */
-    --red-bright:#DA2140;   /* Bright Red — CTA */
-    --teal:      #14242D;   /* Dark Teal — text/anchor */
-    --gray-1:    #F2F2F2;
-    --gray-2:    #E8E8E8;
-    --muted:     #6B6B6B;
-    --white:     #FFFFFF;
-    --ok:        #1f8f4e;
-    --error:     #BE1E2D;
-
-    --display: "Oswald", "Arial Narrow", Arial, Helvetica, sans-serif;
-    --body:    "Roboto", Arial, Helvetica, sans-serif;
-    --radius:  8px;
-    --maxw:    720px;
+    --c-bg:         #14242D;  /* Dark Teal — brand anchor / page bg   */
+    --c-surface:    #1b2f39;  /* card background                      */
+    --c-surface-2:  #243842;  /* inputs / inset panels                */
+    --c-line:       #314853;  /* borders                              */
+    --c-text:       #f4f6f7;  /* primary text (near-white)            */
+    --c-muted:      #9fb1ba;  /* secondary text (teal-gray)           */
+    --c-red:        #BE1E2D;  /* Primary Red — lead brand accent      */
+    --c-red-bright: #DA2140;  /* Bright Red — CTA + highlights only    */
+    --c-red-deep:   #921A24;  /* Deep Red — hovers / depth            */
+    --c-ok:         #3ECF8E;  /* success (functional)                 */
+    --c-warn:       #F2B441;  /* validation warnings (amber)          */
+    --font-head:  'Oswald', 'Arial Narrow', sans-serif;
+    --font-body:  'Roboto', Arial, sans-serif;
+    --radius: 10px;
   }
 
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
   body {
-    background: var(--gray-1);
-    color: var(--teal);
-    font-family: var(--body);
-    line-height: 1.5;
-    padding: 32px 16px;
+    font-family: var(--font-body);
+    background:
+      radial-gradient(1100px 560px at 82% -12%, rgba(190,30,45,0.16), transparent 60%),
+      radial-gradient(800px 460px at -8% 12%, rgba(190,30,45,0.06), transparent 55%),
+      var(--c-bg);
+    color: var(--c-text);
+    line-height: 1.6;
+    min-height: 100vh;
+    padding: 32px 16px 80px;
+    background-attachment: fixed;
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(circle at 50% 0%, black, transparent 78%);
   }
 
+  .wrap { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; }
+
+  /* ---------- HEADER ---------- */
+  header.masthead {
+    display: flex; align-items: center; gap: 16px;
+    padding: 18px 22px; margin-bottom: 24px;
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
+    border-radius: var(--radius);
+    border-top: 4px solid var(--c-red);
+  }
+  /* REPLACE this .logo-slot block with the real PWD circular badge:
+     <img src="pwd-badge.png" alt="PWD Manufacturing" class="logo-slot" /> */
+  .logo-slot {
+    width: 58px; height: 58px; flex: 0 0 58px; border-radius: 50%;
+    background: #ffffff; border: 3px solid var(--c-red);
+    display: grid; place-items: center;
+    font-family: var(--font-head); font-weight: 700; font-size: 19px;
+    color: var(--c-bg); letter-spacing: 0.5px;
+  }
+  .masthead .titles { flex: 1; }
+  .brand-name {
+    font-family: var(--font-head); font-weight: 700; font-size: 24px;
+    letter-spacing: 1px; line-height: 1.05; text-transform: uppercase;
+  }
+  .brand-sub {
+    font-family: var(--font-body); font-weight: 500; font-size: 11px; color: var(--c-muted);
+    text-transform: uppercase; letter-spacing: 2px; margin-top: 4px;
+  }
+
+  /* ---------- HERO / INTRO ---------- */
+  .intro { padding: 8px 4px 24px; }
+  .kicker {
+    font-family: var(--font-head); font-weight: 600; font-size: 13px;
+    letter-spacing: 3px; text-transform: uppercase; color: var(--c-red-bright);
+    margin-bottom: 10px;
+  }
+  .intro h1 {
+    font-family: var(--font-head); font-weight: 700;
+    font-size: clamp(34px, 6vw, 52px); line-height: 1; letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .intro h1 .accent { color: var(--c-red); }
+  .intro p { color: var(--c-muted); margin-top: 14px; max-width: 58ch; font-size: 15px; }
+  .intro p .promise { color: var(--c-text); font-weight: 500; }
+
+  /* ---------- CARD / SECTIONS ---------- */
   .card {
-    max-width: var(--maxw);
-    margin: 0 auto;
-    background: var(--white);
-    border: 1px solid var(--gray-2);
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
     border-radius: var(--radius);
-    overflow: hidden;
-    box-shadow: 0 2px 16px rgba(20, 36, 45, .06);
-  }
-
-  .header {
-    padding: 30px 28px 24px;
-    background: var(--teal);
-    border-bottom: 4px solid var(--red);
-  }
-  .header .eyebrow {
-    font-family: var(--display); text-transform: uppercase; letter-spacing: 2.5px;
-    color: var(--red-bright); font-weight: 600; font-size: .8rem; margin: 0 0 8px;
-  }
-  .header h1 { margin: 0 0 8px; font-family: var(--display); font-weight: 700; text-transform: uppercase; font-size: 1.7rem; color: var(--white); }
-  .header p { margin: 0; color: #cdd6db; font-size: .97rem; }
-
-  form { padding: 26px 28px 28px; }
-
-  .row { display: flex; gap: 16px; flex-wrap: wrap; }
-  .row .field { flex: 1 1 240px; }
-
-  .field { margin-bottom: 18px; }
-  label {
-    display: block;
-    font-family: var(--display);
-    font-size: .82rem;
-    font-weight: 600;
-    letter-spacing: .6px;
-    color: var(--teal);
-    margin-bottom: 6px;
-    text-transform: uppercase;
-  }
-  label .req { color: var(--red); }
-
-  input, select, textarea {
-    width: 100%;
-    background: var(--white);
-    border: 1px solid #c4ccd1;
-    border-radius: var(--radius);
-    color: var(--teal);
-    font: inherit;
-    font-family: var(--body);
-    padding: 11px 12px;
-    transition: border-color .15s ease, box-shadow .15s ease;
-  }
-  input:focus, select:focus, textarea:focus {
-    outline: none;
-    border-color: var(--red);
-    box-shadow: 0 0 0 3px rgba(190, 30, 45, .12);
-  }
-  textarea { resize: vertical; min-height: 90px; }
-  select { appearance: none; cursor: pointer; }
-
-  /* Dropzone */
-  .dropzone {
-    border: 2px dashed #c4ccd1;
-    border-radius: var(--radius);
-    padding: 26px 18px;
-    text-align: center;
-    color: var(--muted);
-    cursor: pointer;
-    transition: border-color .15s ease, background .15s ease;
-  }
-  .dropzone.drag { border-color: var(--red); background: var(--gray-1); }
-  .dropzone strong { color: var(--teal); }
-  .dropzone .browse { color: var(--red); text-decoration: underline; }
-  .hint { font-size: .8rem; color: var(--muted); margin-top: 8px; }
-
-  .filelist { margin-top: 12px; list-style: none; padding: 0; }
-  .filelist li {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 12px;
-    background: var(--gray-1);
-    border: 1px solid var(--gray-2);
-    border-radius: var(--radius);
-    padding: 8px 12px;
-    margin-bottom: 8px;
-    font-size: .9rem;
-  }
-  .filelist .size { color: var(--muted); font-size: .8rem; white-space: nowrap; }
-  .filelist .remove {
-    background: none; border: none; color: var(--red);
-    cursor: pointer; font-size: 1.1rem; line-height: 1; padding: 0 4px;
-  }
-
-  .submit-btn {
-    width: 100%;
-    margin-top: 6px;
-    padding: 15px;
-    background: var(--red-bright);
-    color: var(--white);
-    border: none;
-    border-radius: var(--radius);
-    font-family: var(--display);
-    font-size: 1.05rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: .8px;
-    cursor: pointer;
-    transition: background .15s ease, opacity .15s ease;
-  }
-  .submit-btn:hover { background: var(--red-deep); }
-  .submit-btn:disabled { opacity: .6; cursor: not-allowed; }
-
-  .errorbox {
-    display: none;
+    padding: 26px 26px 28px;
     margin-bottom: 18px;
-    padding: 12px 14px;
-    border: 1px solid var(--error);
-    border-left: 4px solid var(--error);
-    border-radius: var(--radius);
-    background: rgba(190, 30, 45, .06);
-    color: var(--red-deep);
-    font-size: .9rem;
   }
-  .errorbox.show { display: block; }
+  .section-tag {
+    font-family: var(--font-body); font-weight: 700; font-size: 11px; color: var(--c-red-bright);
+    letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px;
+    display: flex; align-items: center; gap: 9px;
+  }
+  .section-tag .num {
+    background: var(--c-red); color: #fff;
+    width: 22px; height: 22px; border-radius: 5px; display: grid; place-items: center;
+    font-family: var(--font-head); font-weight: 600;
+  }
+  .card h2 {
+    font-family: var(--font-head); font-weight: 600; font-size: 23px;
+    margin-bottom: 18px; letter-spacing: 0.4px; text-transform: uppercase;
+  }
 
-  .success {
-    display: none;
-    padding: 52px 28px;
-    text-align: center;
+  /* ---------- FIELDS ---------- */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 560px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  .field { margin-bottom: 16px; }
+  .field:last-child { margin-bottom: 0; }
+  label {
+    display: block; font-family: var(--font-body); font-size: 13px; font-weight: 500;
+    margin-bottom: 7px; letter-spacing: 0.3px;
   }
-  .success.show { display: block; }
-  .success .check {
-    width: 66px; height: 66px; margin: 0 auto 18px;
-    border-radius: 50%;
-    background: rgba(31, 143, 78, .12);
-    color: var(--ok);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 2rem;
+  label .req { color: var(--c-red-bright); margin-left: 2px; font-weight: 700; }
+  label .opt { color: var(--c-muted); font-weight: 400; font-size: 11px; margin-left: 6px;
+    text-transform: uppercase; letter-spacing: 1px; }
+
+  input, textarea {
+    width: 100%; font-family: var(--font-body); font-size: 15px; color: var(--c-text);
+    background: var(--c-surface-2); border: 1px solid var(--c-line);
+    border-radius: 8px; padding: 12px 14px; outline: none;
+    transition: border-color .15s, box-shadow .15s;
   }
-  .success h2 { margin: 0 0 8px; font-family: var(--display); text-transform: uppercase; color: var(--teal); }
-  .success p { color: var(--muted); margin: 0; }
+  input::placeholder, textarea::placeholder { color: #6a7d87; }
+  input:focus, textarea:focus {
+    border-color: var(--c-red);
+    box-shadow: 0 0 0 3px rgba(190,30,45,0.22);
+  }
+  textarea { resize: vertical; min-height: 92px; }
+  .hint { font-size: 12px; color: var(--c-muted); margin-top: 6px; }
+  input.invalid, textarea.invalid { border-color: var(--c-warn); box-shadow: 0 0 0 3px rgba(242,180,65,0.16); }
+  input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
+
+  /* ---------- DROPZONE ---------- */
+  .dropzone {
+    border: 2px dashed var(--c-line); border-radius: var(--radius);
+    background: var(--c-surface-2);
+    padding: 34px 20px; text-align: center; cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .dropzone:hover, .dropzone.drag {
+    border-color: var(--c-red); background: rgba(190,30,45,0.08);
+  }
+  .dropzone .dz-icon { font-size: 34px; color: var(--c-red-bright); }
+  .dropzone .dz-main { font-family: var(--font-head); font-weight: 500; text-transform: uppercase;
+    letter-spacing: 0.5px; margin-top: 8px; font-size: 17px; }
+  .dropzone .dz-sub { color: var(--c-muted); font-size: 13px; margin-top: 5px; }
+  .dropzone .dz-types {
+    font-family: var(--font-body); font-weight: 500; font-size: 11px; color: #6a7d87;
+    margin-top: 12px; letter-spacing: 1px;
+  }
+  .dz-bigfile { font-size: 12px; color: var(--c-muted); margin-top: 12px; text-align: center; }
+
+  .filelist { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .fileitem {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--c-surface-2); border: 1px solid var(--c-line);
+    border-radius: 8px; padding: 10px 12px;
+    animation: pop .25s ease both;
+  }
+  @keyframes pop { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .fileitem .fi-ext {
+    font-family: var(--font-head); font-size: 12px; font-weight: 600;
+    background: var(--c-red); color: #fff; padding: 4px 7px; border-radius: 5px;
+    flex: 0 0 auto; min-width: 44px; text-align: center; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .fileitem .fi-name { flex: 1; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fileitem .fi-size { font-size: 12px; color: var(--c-muted); flex: 0 0 auto; }
+  .fileitem .fi-remove {
+    background: none; border: none; color: var(--c-muted); cursor: pointer;
+    font-size: 20px; line-height: 1; padding: 0 4px; transition: color .15s;
+  }
+  .fileitem .fi-remove:hover { color: var(--c-red-bright); }
+
+  /* ---------- SUBMIT ---------- */
+  .submit-row { display: flex; align-items: center; gap: 16px; margin-top: 4px; flex-wrap: wrap; }
+  button.submit {
+    font-family: var(--font-head); font-weight: 600; font-size: 17px; letter-spacing: 1px;
+    background: var(--c-red-bright); color: #fff;
+    border: none; border-radius: 9px;
+    padding: 15px 36px; cursor: pointer; text-transform: uppercase;
+    transition: transform .12s, box-shadow .15s, background .15s;
+    box-shadow: 0 6px 22px rgba(218,33,64,0.3);
+  }
+  button.submit:hover { background: var(--c-red-deep); transform: translateY(-1px); }
+  button.submit:active { transform: translateY(0); }
+  button.submit:disabled { background: #5a3a3f; color: #b9a7aa; cursor: not-allowed; box-shadow: none; }
+  .submit-note { font-size: 13px; color: var(--c-muted); }
+
+  .form-error {
+    display: none; background: rgba(242,180,65,0.1); border: 1px solid rgba(242,180,65,0.45);
+    color: var(--c-warn); border-radius: 8px; padding: 12px 14px; font-size: 14px; margin-bottom: 16px;
+  }
+  .form-error.show { display: block; }
+
+  /* ---------- SUCCESS STATE ---------- */
+  .success { display: none; text-align: center; padding: 46px 26px; }
+  .success.show { display: block; animation: pop .4s ease both; }
+  .success .ok-badge {
+    width: 74px; height: 74px; border-radius: 50%; margin: 0 auto 20px;
+    background: rgba(62,207,142,0.12); border: 2px solid var(--c-ok);
+    display: grid; place-items: center; font-size: 38px; color: var(--c-ok);
+  }
+  .success h2 { font-family: var(--font-head); font-weight: 600; font-size: 28px; margin-bottom: 12px;
+    text-transform: uppercase; letter-spacing: 0.5px; }
+  .success p { color: var(--c-muted); max-width: 46ch; margin: 0 auto 24px; }
+  .success button {
+    font-family: var(--font-body); font-weight: 500; font-size: 14px;
+    background: var(--c-surface-2); color: var(--c-text);
+    border: 1px solid var(--c-line); border-radius: 8px; padding: 11px 22px; cursor: pointer;
+  }
+  .success button:hover { border-color: var(--c-red); }
+
+  footer { text-align: center; color: var(--c-muted); font-size: 12px; margin-top: 28px;
+    letter-spacing: 1px; line-height: 1.9; }
+  footer .ft-tag { font-family: var(--font-head); color: var(--c-red-bright); letter-spacing: 2px;
+    text-transform: uppercase; display: block; margin-bottom: 4px; }
 </style>
 </head>
 <body>
-  <div class="card">
-    <div class="header">
-      <p class="eyebrow">PWD Manufacturing</p>
-      <h1>Request a Quote</h1>
-      <p>Tell us about your part and upload your files. You bring the challenge — we build the solution.</p>
+<div class="wrap">
+
+  <!-- ============ HEADER (swap .logo-slot for the real PWD badge PNG) ============ -->
+  <header class="masthead">
+    <div class="logo-slot">PWD</div>
+    <div class="titles">
+      <div class="brand-name">PWD Manufacturing</div>
+      <div class="brand-sub">Precision Machine Shop &middot; Russellville, AR</div>
     </div>
+  </header>
 
-    <!-- FORM -->
-    <form id="quoteForm" novalidate>
-      <div class="errorbox" id="errorBox"></div>
-
-      <div class="row">
-        <div class="field">
-          <label for="name">Full name <span class="req">*</span></label>
-          <input type="text" id="name" name="name" required autocomplete="name" />
-        </div>
-        <div class="field">
-          <label for="company">Company</label>
-          <input type="text" id="company" name="company" autocomplete="organization" />
-        </div>
-      </div>
-
-      <div class="row">
-        <div class="field">
-          <label for="email">Email <span class="req">*</span></label>
-          <input type="email" id="email" name="email" required autocomplete="email" />
-        </div>
-        <div class="field">
-          <label for="phone">Phone</label>
-          <input type="tel" id="phone" name="phone" autocomplete="tel" />
-        </div>
-      </div>
-
-      <div class="row">
-        <div class="field">
-          <label for="material">Material <span class="req">*</span></label>
-          <select id="material" name="material" required>
-            <option value="" selected disabled>Select…</option>
-            <option>Aluminum</option>
-            <option>Steel</option>
-            <option>Stainless</option>
-            <option>Brass</option>
-            <option>Titanium</option>
-            <option>Plastic / Delrin</option>
-            <option>Other</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="quantity">Quantity <span class="req">*</span></label>
-          <input type="number" id="quantity" name="quantity" min="1" step="1" required />
-        </div>
-      </div>
-
-      <div class="row">
-        <div class="field">
-          <label for="dueDate">Needed by</label>
-          <input type="date" id="dueDate" name="dueDate" />
-        </div>
-        <div class="field">
-          <label for="processing">Processing <span class="req">*</span></label>
-          <select id="processing" name="processing" required>
-            <option value="" selected disabled>Select…</option>
-            <option>CNC Milling</option>
-            <option>CNC Turning</option>
-            <option>Laser Cutting</option>
-            <option>Welding</option>
-            <option>Finishing</option>
-            <option>Other</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="field">
-        <label for="dimensions">Dimensions / tolerances</label>
-        <input type="text" id="dimensions" name="dimensions" placeholder="e.g. 120 × 80 × 25 mm, ±0.05" />
-      </div>
-
-      <div class="field">
-        <label>Files</label>
-        <div class="dropzone" id="dropzone">
-          <strong>Drag &amp; drop files here</strong> or <span class="browse">browse</span><br />
-          Drawings, STEP/CAD, photos — PDF, images, .step/.stp/.dxf, etc.
-        </div>
-        <div class="hint">
-          Total upload limit ~25&nbsp;MB. For larger files, paste a shareable
-          Dropbox / Google&nbsp;Drive / WeTransfer link in the field below.
-        </div>
-        <input type="file" id="fileInput" multiple hidden />
-        <ul class="filelist" id="fileList"></ul>
-      </div>
-
-      <div class="field">
-        <label for="largeFileLink">Link to large files</label>
-        <input type="url" id="largeFileLink" name="largeFileLink"
-               placeholder="https://dropbox.com/… or Google Drive / WeTransfer link" />
-        <div class="hint">Optional — use this for files over ~25&nbsp;MB instead of uploading.</div>
-      </div>
-
-      <div class="field">
-        <label for="notes">Anything else</label>
-        <textarea id="notes" name="notes" placeholder="Project context, finish requirements, tolerances…"></textarea>
-      </div>
-
-      <button type="submit" class="submit-btn" id="submitBtn">Send quote request</button>
-    </form>
-
-    <!-- SUCCESS SCREEN -->
-    <div class="success" id="successScreen">
-      <div class="check">✓</div>
-      <h2>Request Sent</h2>
-      <p>Thanks — we've got your details and files. The PWD team will be in touch shortly with pricing and a lead time.</p>
-    </div>
+  <div class="intro">
+    <div class="kicker">Precision &middot; Passion &middot; Performance</div>
+    <h1>Request a <span class="accent">Quote</span></h1>
+    <p><span class="promise">You bring the challenge. We build the solution.</span> Tell us what you need made &mdash; CNC milling, turning, custom parts &mdash; and send your prints, photos, or CAD files. The more detail up front, the faster we turn it around.</p>
   </div>
 
+  <!-- ============ THE FORM ============ -->
+  <form id="quoteForm" novalidate>
+    <div class="form-error" id="formError"></div>
+
+    <!-- SECTION 1 — CONTACT -->
+    <div class="card">
+      <div class="section-tag"><span class="num">1</span> Your Details</div>
+      <h2>Where do we send the quote?</h2>
+      <div class="grid-2">
+        <div class="field">
+          <label for="name">Name<span class="req">*</span></label>
+          <input type="text" id="name" name="name" placeholder="Jane Smith" required />
+        </div>
+        <div class="field">
+          <label for="company">Company<span class="opt">optional</span></label>
+          <input type="text" id="company" name="company" placeholder="Acme Fabrication" />
+        </div>
+        <div class="field">
+          <label for="email">Email<span class="req">*</span></label>
+          <input type="email" id="email" name="email" placeholder="jane@acme.com" required />
+        </div>
+        <div class="field">
+          <label for="phone">Phone<span class="opt">optional</span></label>
+          <input type="tel" id="phone" name="phone" placeholder="(479) 123-4567" />
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 2 — JOB SPECS -->
+    <div class="card">
+      <div class="section-tag"><span class="num">2</span> Job Specs</div>
+      <h2>What are we making?</h2>
+
+      <div class="grid-2">
+        <div class="field">
+          <label for="material">Material<span class="req">*</span></label>
+          <input type="text" id="material" name="material" list="materials"
+                 placeholder="e.g. 6061 Aluminum" required autocomplete="off" />
+          <datalist id="materials">
+            <option value="6061 Aluminum"></option>
+            <option value="7075 Aluminum"></option>
+            <option value="304 Stainless Steel"></option>
+            <option value="316 Stainless Steel"></option>
+            <option value="1018 Mild Steel"></option>
+            <option value="4140 Alloy Steel"></option>
+            <option value="A36 Steel"></option>
+            <option value="12L14 Steel"></option>
+            <option value="Brass C360"></option>
+            <option value="Copper C110"></option>
+            <option value="Titanium Grade 5"></option>
+            <option value="Delrin / Acetal"></option>
+            <option value="Nylon"></option>
+            <option value="PEEK"></option>
+            <option value="Cast Iron"></option>
+          </datalist>
+          <div class="hint">Start typing &mdash; pick from the list or enter your own.</div>
+        </div>
+        <div class="field">
+          <label for="quantity">Quantity<span class="req">*</span></label>
+          <input type="number" id="quantity" name="quantity" min="1" step="1"
+                 placeholder="e.g. 25" required />
+          <div class="hint">How many parts do you need?</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="dueDate">Date Needed<span class="req">*</span></label>
+        <input type="date" id="dueDate" name="dueDate" required />
+        <div class="hint">When do you need these delivered?</div>
+      </div>
+
+      <div class="field">
+        <label for="dimensions">Key Dimensions &amp; Tolerances<span class="opt">if known</span></label>
+        <textarea id="dimensions" name="dimensions"
+          placeholder="If your print or CAD file already has dimensions, skip this. Otherwise jot down the critical sizes and tolerances — e.g. 4.00&quot; x 2.50&quot; x 0.75&quot;, bore 1.250&quot; +0.000/-0.001, finish 32 Ra."></textarea>
+        <div class="hint">We pull dimensions off your files first &mdash; this is just a backup if you have specifics in mind.</div>
+      </div>
+
+      <div class="field">
+        <label for="processing">Pre- / Post-Processing<span class="opt">optional</span></label>
+        <textarea id="processing" name="processing"
+          placeholder="Anything beyond the machining — e.g. anodize (black), heat treat to 40 HRC, surface grind, deburr, powder coat, passivate, plating, paint color..."></textarea>
+        <div class="hint">List any finishing, treatment, or extra steps. Write it however makes sense to you.</div>
+      </div>
+
+      <div class="field">
+        <label for="notes">Anything Else<span class="opt">optional</span></label>
+        <textarea id="notes" name="notes" style="min-height: 70px;"
+          placeholder="Recurring order? Tight deadline? Reference part number? Inspection or cert requirements? Big CAD file to share via a link? Tell us here."></textarea>
+      </div>
+    </div>
+
+    <!-- SECTION 3 — FILES -->
+    <div class="card">
+      <div class="section-tag"><span class="num">3</span> Attachments</div>
+      <h2>Drawings, Photos &amp; CAD Files</h2>
+
+      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload files">
+        <div class="dz-icon">&#8682;</div>
+        <div class="dz-main">Drag files here, or click to browse</div>
+        <div class="dz-sub">Prints, photos, PDFs, or CAD files. CAD is best &mdash; that's where the exact dimensions live.</div>
+        <div class="dz-types">PDF &middot; PNG &middot; JPG &middot; STEP &middot; STP &middot; IGES &middot; DXF &middot; DWG &middot; SLDPRT &middot; X_T &middot; STL</div>
+      </div>
+      <input type="file" id="fileInput" multiple style="display:none"
+             accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.heic,.step,.stp,.iges,.igs,.dxf,.dwg,.x_t,.x_b,.sldprt,.sldasm,.ipt,.iam,.3mf,.stl,.f3d,.prt" />
+      <div class="filelist" id="filelist"></div>
+      <div class="dz-bigfile">Upload limit ~25&nbsp;MB total. Got a large CAD assembly? Drop a share link (Drive/Dropbox) in &ldquo;Anything else&rdquo; above instead.</div>
+    </div>
+
+    <!-- SUBMIT -->
+    <div class="card">
+      <div class="submit-row">
+        <button type="submit" class="submit" id="submitBtn">Send Quote Request</button>
+        <span class="submit-note">We'll get back to you fast &mdash; usually within one business day.</span>
+      </div>
+    </div>
+  </form>
+
+  <!-- SUCCESS -->
+  <div class="card success" id="success">
+    <div class="ok-badge">&#10003;</div>
+    <h2>Quote Request Received</h2>
+    <p>Thanks &mdash; we've got your details and files. We'll review everything and get a quote back to you shortly. Check your email for a confirmation.</p>
+    <button id="resetBtn">Submit another request</button>
+  </div>
+
+  <footer>
+    <span class="ft-tag">Precision. Passion. Performance.</span>
+    PWD Manufacturing &middot; Russellville, AR &middot; 479-219-1025 &middot; pwdmanufacturing.com
+  </footer>
+</div>
+
 <script>
-  // ─── Config ────────────────────────────────────────────────────────────
-  // Paste your deployed Apps Script /exec URL here after deploy.
-  const SCRIPT_URL = "PASTE_APPS_SCRIPT_EXEC_URL_HERE";
+/* ================================================================
+   CONFIG
 
-  const MAX_TOTAL_BYTES = 25 * 1024 * 1024; // ~25 MB upload guard
-  // ───────────────────────────────────────────────────────────────────────
+   1) Deploy Code.gs as a Web app (see DEPLOY.md) and copy its /exec URL.
+   2) Paste that URL into SCRIPT_URL below.
+   3) Leave DEMO_MODE = false for the live form.
+      Set DEMO_MODE = true only to preview the UI without a backend
+      (it just shows the success screen, posts nothing).
+   ================================================================ */
+const DEMO_MODE  = false;
+const SCRIPT_URL = "PASTE_YOUR_APPS_SCRIPT_EXEC_URL_HERE";   // e.g. https://script.google.com/macros/s/XXXX/exec
 
-  const form          = document.getElementById('quoteForm');
-  const successScreen = document.getElementById('successScreen');
-  const errorBox      = document.getElementById('errorBox');
-  const submitBtn     = document.getElementById('submitBtn');
-  const dropzone      = document.getElementById('dropzone');
-  const fileInput     = document.getElementById('fileInput');
-  const fileListEl    = document.getElementById('fileList');
+const MAX_TOTAL_BYTES = 25 * 1024 * 1024;   // ~25 MB upload guard
 
-  let selectedFiles = []; // File objects
+/* ---------- File handling ---------- */
+const dropzone  = document.getElementById("dropzone");
+const fileInput = document.getElementById("fileInput");
+const filelist  = document.getElementById("filelist");
+let files = [];
 
-  // ─── File picker + drag & drop ───────────────────────────────────────────
-  dropzone.addEventListener('click', () => fileInput.click());
-  fileInput.addEventListener('change', () => { addFiles(fileInput.files); fileInput.value = ''; });
+function fmtSize(b) {
+  if (b < 1024) return b + " B";
+  if (b < 1048576) return (b / 1024).toFixed(0) + " KB";
+  return (b / 1048576).toFixed(1) + " MB";
+}
+function extOf(name) {
+  const m = name.split(".").pop();
+  return m && m.length <= 5 ? m : "file";
+}
+function renderFiles() {
+  filelist.innerHTML = "";
+  files.forEach((f, i) => {
+    const row = document.createElement("div");
+    row.className = "fileitem";
+    row.innerHTML = `
+      <span class="fi-ext">${extOf(f.name)}</span>
+      <span class="fi-name">${f.name}</span>
+      <span class="fi-size">${fmtSize(f.size)}</span>
+      <button type="button" class="fi-remove" aria-label="Remove">&times;</button>`;
+    row.querySelector(".fi-remove").onclick = () => { files.splice(i, 1); renderFiles(); };
+    filelist.appendChild(row);
+  });
+}
+function addFiles(list) {
+  for (const f of list) {
+    if (!files.some(x => x.name === f.name && x.size === f.size)) files.push(f);
+  }
+  renderFiles();
+}
 
-  ['dragenter', 'dragover'].forEach(evt =>
-    dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.add('drag'); }));
-  ['dragleave', 'drop'].forEach(evt =>
-    dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.remove('drag'); }));
-  dropzone.addEventListener('drop', e => { if (e.dataTransfer) addFiles(e.dataTransfer.files); });
+dropzone.onclick = () => fileInput.click();
+dropzone.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); } };
+fileInput.onchange = (e) => addFiles(e.target.files);
+["dragenter", "dragover"].forEach(ev =>
+  dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add("drag"); }));
+["dragleave", "drop"].forEach(ev =>
+  dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove("drag"); }));
+dropzone.addEventListener("drop", e => addFiles(e.dataTransfer.files));
 
-  function addFiles(fileObjs) {
-    for (const f of fileObjs) selectedFiles.push(f);
-    renderFileList();
+/* ---------- Encode files to base64 for the JSON payload ---------- */
+function readAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result || "";
+      const comma = result.indexOf(",");
+      resolve(comma >= 0 ? result.slice(comma + 1) : result); // strip "data:...;base64,"
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+async function encodeFiles(list) {
+  const out = [];
+  for (const f of list) {
+    out.push({ name: f.name, mimeType: f.type || "application/octet-stream", dataB64: await readAsBase64(f) });
+  }
+  return out;
+}
+
+/* ---------- Validation + submit ---------- */
+const form    = document.getElementById("quoteForm");
+const errBox  = document.getElementById("formError");
+const submitBtn = document.getElementById("submitBtn");
+const required = ["name", "email", "material", "quantity", "dueDate"];
+
+function showError(msg) { errBox.textContent = msg; errBox.classList.add("show"); errBox.scrollIntoView({behavior:"smooth", block:"center"}); }
+function clearError() { errBox.classList.remove("show"); }
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  clearError();
+  let firstBad = null;
+  for (const id of required) {
+    const el = document.getElementById(id);
+    if (!el.value.trim()) { el.classList.add("invalid"); if (!firstBad) firstBad = el; }
+    else el.classList.remove("invalid");
+  }
+  const email = document.getElementById("email");
+  if (email.value && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.value)) {
+    email.classList.add("invalid"); if (!firstBad) firstBad = email;
+  }
+  if (firstBad) { showError("Please fill in the required fields (marked with *)."); firstBad.focus(); return; }
+
+  /* File-size guard → steer big uploads to a share link in "Anything else". */
+  const totalBytes = files.reduce((s, f) => s + f.size, 0);
+  if (totalBytes > MAX_TOTAL_BYTES) {
+    showError('Your files total ' + fmtSize(totalBytes) + ', over the ~25 MB upload limit. ' +
+      'Remove the large files and paste a Dropbox / Google Drive / WeTransfer share link ' +
+      'into the "Anything else" box above instead.');
+    document.getElementById("notes").focus();
+    return;
   }
 
-  function removeFile(idx) {
-    selectedFiles.splice(idx, 1);
-    renderFileList();
-  }
+  const payload = {
+    name: form.name.value.trim(),
+    company: form.company.value.trim(),
+    email: form.email.value.trim(),
+    phone: form.phone.value.trim(),
+    material: form.material.value.trim(),
+    quantity: Number(form.quantity.value),
+    due_date: form.dueDate.value,
+    dimensions: form.dimensions.value.trim(),
+    processing: form.processing.value.trim(),
+    notes: form.notes.value.trim(),
+    submitted_at: new Date().toISOString(),
+  };
 
-  function fmtSize(bytes) {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
-    return (bytes / 1024 / 1024).toFixed(1) + ' MB';
-  }
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Sending…";
 
-  function renderFileList() {
-    fileListEl.innerHTML = '';
-    selectedFiles.forEach((f, idx) => {
-      const li = document.createElement('li');
-      const nameSpan = document.createElement('span');
-      nameSpan.textContent = f.name;
-      const sizeSpan = document.createElement('span');
-      sizeSpan.className = 'size';
-      sizeSpan.textContent = fmtSize(f.size);
-      const rm = document.createElement('button');
-      rm.type = 'button';
-      rm.className = 'remove';
-      rm.textContent = '×';
-      rm.setAttribute('aria-label', 'Remove ' + f.name);
-      rm.addEventListener('click', () => removeFile(idx));
-      const right = document.createElement('span');
-      right.style.display = 'flex';
-      right.style.alignItems = 'center';
-      right.style.gap = '12px';
-      right.appendChild(sizeSpan);
-      right.appendChild(rm);
-      li.appendChild(nameSpan);
-      li.appendChild(right);
-      fileListEl.appendChild(li);
-    });
-  }
-
-  // ─── Helpers ──────────────────────────────────────────────────────────────
-  function showError(msg) {
-    errorBox.textContent = msg;
-    errorBox.classList.add('show');
-    errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
-  function clearError() {
-    errorBox.textContent = '';
-    errorBox.classList.remove('show');
-  }
-
-  // Read a File as base64 (stripping the data: prefix).
-  function readAsBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result || '';
-        const comma = result.indexOf(',');
-        resolve(comma >= 0 ? result.slice(comma + 1) : result);
-      };
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
-  }
-
-  function validate() {
-    const required = [
-      ['name', 'your name'],
-      ['email', 'your email'],
-      ['material', 'a material'],
-      ['quantity', 'a quantity'],
-      ['processing', 'a processing type']
-    ];
-    for (const [id, label] of required) {
-      const el = document.getElementById(id);
-      if (!el.value || !el.value.trim()) {
-        el.focus();
-        return 'Please provide ' + label + '.';
-      }
-    }
-    const email = document.getElementById('email').value.trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      document.getElementById('email').focus();
-      return 'Please enter a valid email address.';
-    }
-    return null;
-  }
-
-  // ─── Submit ────────────────────────────────────────────────────────────────
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    clearError();
-
-    const validationError = validate();
-    if (validationError) { showError(validationError); return; }
-
-    // File-size guard → steer them to the "Link to large files" field.
-    const largeFileLink = document.getElementById('largeFileLink').value.trim();
-    const totalBytes = selectedFiles.reduce((sum, f) => sum + f.size, 0);
-    if (totalBytes > MAX_TOTAL_BYTES && !largeFileLink) {
-      showError('Your files total ' + fmtSize(totalBytes) + ', over the ~25 MB upload limit. ' +
-        'Remove the large files and paste a Dropbox / Google Drive / WeTransfer share link ' +
-        'into the "Link to large files" field instead.');
-      document.getElementById('largeFileLink').focus();
-      return;
-    }
-
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Sending…';
-
-    try {
-      const files = [];
-      for (const f of selectedFiles) {
-        files.push({
-          name: f.name,
-          mimeType: f.type || 'application/octet-stream',
-          dataB64: await readAsBase64(f)
-        });
-      }
-
-      const payload = {
-        name:       document.getElementById('name').value.trim(),
-        company:    document.getElementById('company').value.trim(),
-        email:      document.getElementById('email').value.trim(),
-        phone:      document.getElementById('phone').value.trim(),
-        material:   document.getElementById('material').value,
-        quantity:   document.getElementById('quantity').value.trim(),
-        dueDate:    document.getElementById('dueDate').value,
-        dimensions: document.getElementById('dimensions').value.trim(),
-        processing: document.getElementById('processing').value,
-        notes:      document.getElementById('notes').value.trim(),
-        largeFileLink: largeFileLink,
-        files: files
-      };
-
-      // CRITICAL (CORS): send a plain string body with NO custom headers so the
-      // browser treats this as a "simple request" and skips the OPTIONS preflight
-      // that Apps Script web apps cannot answer. Do NOT add a Content-Type header.
+  try {
+    if (DEMO_MODE) {
+      console.log("QUOTE PAYLOAD (demo):", payload, "FILES:", files.map(f => f.name));
+      await new Promise(r => setTimeout(r, 700));
+    } else {
+      /* REAL SUBMISSION — POST as a SIMPLE request: a plain string body with NO
+         custom headers, so the browser skips the CORS preflight that Apps Script
+         web apps cannot answer. Do NOT add a Content-Type header here. */
+      const withFiles = { ...payload, files: await encodeFiles(files) };
       const res = await fetch(SCRIPT_URL, {
         method: "POST",
-        body: JSON.stringify(payload)
+        body: JSON.stringify(withFiles),   // text/plain by default → no preflight
       });
-
-      // If reading the response proves unreliable after deploy, switch the fetch
-      // above to { method:"POST", body:..., mode:"no-cors" } and treat a
-      // non-throwing fetch as success (you won't be able to read res then).
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error || 'The server reported an error.');
-
-      form.style.display = 'none';
-      successScreen.classList.add('show');
-
-    } catch (err) {
-      showError("We couldn't send your request right now. Please try again, or email us directly. (" +
-        (err && err.message ? err.message : err) + ")");
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Send quote request';
+      if (!data.ok) throw new Error(data.error || "The server reported an error.");
     }
-  });
+    form.style.display = "none";
+    document.getElementById("success").classList.add("show");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  } catch (err) {
+    showError("Something went wrong sending your request. Please try again or call us at 479-219-1025.");
+    console.error(err);
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Send Quote Request";
+  }
+});
+
+document.getElementById("resetBtn").onclick = () => {
+  form.reset(); files = []; renderFiles();
+  document.getElementById("success").classList.remove("show");
+  form.style.display = "";
+  submitBtn.disabled = false;
+  submitBtn.textContent = "Send Quote Request";
+};
 </script>
 </body>
 </html>

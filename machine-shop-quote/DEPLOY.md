@@ -11,7 +11,7 @@ Do these steps in order, signed in as that dedicated account.
 1. Go to <https://sheets.google.com> → **Blank spreadsheet**.
 2. Rename the bottom tab from `Sheet1` to **`Quotes`** (exact, case-sensitive).
 3. *(Optional but nice)* add a header row:
-   `Timestamp | Name | Company | Email | Phone | Material | Quantity | Due date | Dimensions | Processing | Notes | Large-file link | Uploaded files`
+   `Timestamp | Name | Company | Email | Phone | Material | Quantity | Due date | Dimensions | Processing | Notes | Uploaded files`
 4. Copy the **spreadsheet ID** from the URL — the long string between `/d/` and `/edit`:
    `https://docs.google.com/spreadsheets/d/`**`THIS_PART`**`/edit`
    → this is your **`SHEET_ID`**.

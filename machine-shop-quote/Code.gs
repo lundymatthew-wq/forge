@@ -45,13 +45,12 @@ function doPost(e) {
     const phone      = payload.phone      || '';
     const material   = payload.material   || '';
     const quantity   = payload.quantity   || '';
-    const dueDate    = payload.dueDate    || '';
+    const dueDate    = payload.due_date   || '';
     const dimensions = payload.dimensions || '';
     const processing = payload.processing || '';
+    // "Anything else" — also where customers paste a Dropbox/Drive/WeTransfer
+    // share link for files too big to upload (over the form's ~25 MB guard).
     const notes      = payload.notes      || '';
-    // Always-available alternative for files too big to upload (Dropbox / Drive /
-    // WeTransfer link). Customers can use this instead of, or alongside, uploads.
-    const largeFileLink = payload.largeFileLink || '';
 
     // 1. Save each uploaded file to the Drive folder, collecting share links.
     const folder = DriveApp.getFolderById(FOLDER_ID);
@@ -67,7 +66,7 @@ function doPost(e) {
     const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('Quotes');
     sheet.appendRow([
       new Date(), name, company, email, phone, material, quantity,
-      dueDate, dimensions, processing, notes, largeFileLink, fileLinks.join('\n')
+      dueDate, dimensions, processing, notes, fileLinks.join('\n')
     ]);
 
     // 3. Email the shop an alert with all fields + links.
@@ -86,8 +85,6 @@ function doPost(e) {
       'Dimensions: ' + dimensions,
       'Processing: ' + processing,
       'Notes:      ' + notes,
-      '',
-      'Large-file link: ' + (largeFileLink || '(none provided)'),
       '',
       'Uploaded files (' + fileLinks.length + '):',
       fileLinks.length ? fileLinks.join('\n') : '(none uploaded)',

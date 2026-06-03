@@ -34,8 +34,8 @@ the backend reads these keys exactly and writes them to the sheet in this order:
   "dueDate":    "2026-07-01",
   "dimensions": "120 x 80 x 25 mm, ±0.05",
   "processing": "CNC Milling",
-  "notes":      "Anodized finish preferred",
-  "largeFileLink": "https://www.dropbox.com/s/...",
+  "notes":      "Anodized finish preferred. Large CAD: https://dropbox.com/s/...",
+  "due_date":   "2026-07-01",
   "files": [
     { "name": "part.step", "mimeType": "application/step", "dataB64": "<base64>" }
   ]
@@ -43,13 +43,14 @@ the backend reads these keys exactly and writes them to the sheet in this order:
 ```
 
 **Sheet column order** (for reference — the backend handles this, do not send it):
-`timestamp · name · company · email · phone · material · quantity · dueDate · dimensions · processing · notes · largeFileLink · uploadedFileLinks`
+`timestamp · name · company · email · phone · material · quantity · due_date · dimensions · processing · notes · uploadedFileLinks`
 
+- The date field key is **`due_date`** (snake_case), matching the live form.
 - All text fields are optional except whatever you choose to validate client-side.
-- `largeFileLink` — an always-available text field for a Dropbox / Drive / WeTransfer
-  link. Used when files are too big to upload (see §5), but customers may fill it in
-  anytime. Send `""` if empty.
-- `files` is an array; send `[]` if none.
+- **Large files (>25 MB):** there is no separate field — the customer pastes a
+  Dropbox / Drive / WeTransfer share link into the **"Anything else"** (`notes`)
+  field instead of uploading (see §5). It lands in the `notes` column and the email.
+- `files` is an array; send `[]` if none. `quantity` may be a number or string.
 - Each file: `name` (string), `mimeType` (string), `dataB64` (base64 **without**
   the `data:...;base64,` prefix).
 
@@ -123,11 +124,10 @@ function readAsBase64(file) {
 ## 5. File-size guard (required)
 
 Apps Script + base64 can't take unlimited payloads. Before posting, sum file sizes;
-if the total exceeds **~25 MB**, block the submit and point the user to the
-always-visible **"Link to large files"** field (`largeFileLink`) — they paste a
-Dropbox / Google Drive / WeTransfer share link there instead of uploading.
-Keep that field visible at all times (with a one-line helper noting the ~25 MB
-upload limit and the link option), so it's available whether or not they hit the cap.
+if the total exceeds **~25 MB**, block the submit and point the user to paste a
+Dropbox / Google Drive / WeTransfer share link into the **"Anything else"** (`notes`)
+field instead of uploading. A helper line under the dropzone notes the ~25 MB limit
+and the link option, so customers know the alternative is available.
 
 ```js
 const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
@@ -155,15 +155,15 @@ Adapt the field reads to the branded markup; the request itself must stay as-is.
 
 ```js
 async function submitQuote(formData, selectedFiles) {
-  // formData = { name, company, email, phone, material, quantity, dueDate,
-  //              dimensions, processing, notes, largeFileLink }
+  // formData = { name, company, email, phone, material, quantity, due_date,
+  //              dimensions, processing, notes }
   // selectedFiles = array of File objects
 
-  // 25 MB guard → send them to the "Link to large files" field instead.
+  // 25 MB guard → send them to the "Anything else" (notes) field instead.
   const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
   const total = selectedFiles.reduce((s, f) => s + f.size, 0);
-  if (total > MAX_TOTAL_BYTES && !formData.largeFileLink) {
-    throw new Error("Files exceed ~25 MB. Paste a Dropbox / Drive / WeTransfer link in the \"Link to large files\" field instead.");
+  if (total > MAX_TOTAL_BYTES) {
+    throw new Error("Files exceed ~25 MB. Paste a Dropbox / Drive / WeTransfer link in the \"Anything else\" field instead.");
   }
 
   // Encode files

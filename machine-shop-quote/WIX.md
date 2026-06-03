@@ -75,8 +75,8 @@ Customers never see Google. When a quote comes in:
   **view or download** each file.
 - **Large files (>25 MB)**: instead of uploading, the customer pastes a
   **Dropbox / Google Drive / WeTransfer** share link into the form's
-  **"Link to large files"** field. That link shows up in the email and the Sheet
-  row, and the owners download from there.
+  **"Anything else"** field. That link shows up in the `notes` column and the
+  email, and the owners download from there.
 
 Either way the owner gets everything they need to download from the **one alert
 email**, sent the moment the form is submitted.
